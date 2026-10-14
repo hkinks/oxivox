@@ -46,6 +46,11 @@
         default = rustle;
       };
 
+      homeManagerModules = rec {
+        rustle = import ./nix/home-manager.nix { inherit self; };
+        default = rustle;
+      };
+
       devShells.${system}.default = pkgs.mkShell {
         inherit buildInputs;
         nativeBuildInputs = nativeBuildInputs ++ (with pkgs; [ cargo rustc clippy rustfmt rust-analyzer ]);
