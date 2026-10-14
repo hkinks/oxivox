@@ -3,6 +3,7 @@
 language = "auto"
 max_length_secs = 300
 gpu = true
+media_ignore = []                              # players never paused while recording, e.g. ["vlc"]
 # source = "alsa_input.usb-..."                # PipeWire node name of the microphone; default: the default source
 # cancel_submap = "rustle"                     # see hyprland.conf
 

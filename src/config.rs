@@ -18,6 +18,8 @@ pub struct Config {
     pub gpu: bool,
     /// PipeWire node name or serial of the microphone; the default source when unset.
     pub source: Option<String>,
+    /// Media players (MPRIS names such as "vlc") that are never paused while recording.
+    pub media_ignore: Vec<String>,
     pub overlay: OverlayConfig,
     pub paste: PasteConfig,
     /// Hyprland submap that binds Escape to `rustle cancel`; entered while recording or transcribing.
@@ -53,6 +55,7 @@ impl Default for Config {
             max_length_secs: 300,
             gpu: true,
             source: None,
+            media_ignore: Vec::new(),
             overlay: OverlayConfig::default(),
             paste: PasteConfig::default(),
             cancel_submap: None,

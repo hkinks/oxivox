@@ -173,7 +173,7 @@ fn run_daemon(dry_run: bool) -> Result<()> {
         } else {
             std::sync::Arc::new(HyprlandOutput::new(hypr, config.paste.clone()))
         },
-        media: Box::new(Playerctl::default()),
+        media: Box::new(Playerctl::new(config.media_ignore.clone())),
         cancel_key,
     };
     let (daemon, messages) = daemon::Daemon::new(config, platform, Box::new(engine));
