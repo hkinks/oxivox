@@ -25,7 +25,9 @@ rustle status
 `contrib/` has a Hyprland bind snippet (including the Escape submap), a systemd user unit and example
 `config.toml` / `theme.toml`; [theming.md](theming.md) covers the Noctalia template.
 
-Overlay on Hyprland (`rustle overlay-demo`): warming up, recording, transcribing, error flash. The dots follow the voice level with automatic gain.
+Overlay on Hyprland (`rustle overlay-demo`): warming up (2 s), the live ping, silent recording, speech, transcribing, error flash. The dots follow the voice level with automatic gain.
+
+Top to bottom: warming up, the ping travelling outward, the ping's end, recording in silence, recording speech, error flash.
 
 ![overlay states](overlay-states.png)
 

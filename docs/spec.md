@@ -51,8 +51,8 @@ Platform adapters, one trait each:
 
 | step | daemon | overlay |
 |---|---|---|
-| `toggle` from idle | note focused window, open the default PipeWire source, buffer 16 kHz mono f32, pause MPRIS players | appears at once: **warming up** (dim flat line) |
-| mic live | first non-zero frames (Bluetooth call-mode switch ~1 s); leading all-zero audio is dropped | dots react to the voice, in the accent colour |
+| `toggle` from idle | note focused window, open the default PipeWire source, buffer 16 kHz mono f32, pause MPRIS players | appears at once: **warming up** (dim breathing dots) |
+| mic live | first non-zero frames (Bluetooth call-mode switch ~1 s); leading all-zero audio is dropped | ping, dots turn accent-coloured and react to the voice |
 | `toggle` while recording | close the stream (headset returns to music mode), run VAD energy check, then the engine | **transcribing** animation |
 | result | trim; drop whisper non-speech tokens (`[BLANK_AUDIO]`, `(music)` etc.); empty → no paste | hides; empty → brief "nothing heard" flash |
 | paste | save clipboard, set text, focus the step-1 window, send Ctrl+Shift+V (terminals) or Ctrl+V, restore clipboard after 500 ms, resume MPRIS | hidden |
@@ -63,9 +63,9 @@ Max recording length: config, default 300 s (stops and transcribes).
 ## Overlay
 
 - Size 360 x 56 logical px, bottom centre, 48 px above the bottom edge; rounded corners (radius 12), 1 px border.
-- Content: a centred row of 19 dots in the accent colour. Recording: the centre dot shows the current voice level and
+- Content: a centred row of 19 dots. Recording, in the accent colour: the centre dot shows the current voice level and
   older levels ripple outwards; dots grow fast and shrink slowly; automatic gain (the loudest recent speech is a full
-  dot, recovering over ~12 s), room noise stays at the smallest size. Warming up: small dim static dots. Transcribing:
+  dot, recovering over ~12 s), room noise stays at the smallest size. Warming up (microphone not live yet): small dots in a dim neutral text colour that breathe slowly (2.4 s, opacity only). The moment the microphone goes live (the switch to recording) a single ping runs outward from the centre dot (0.32 s) and the dots turn accent-coloured; a silent recording stays accent-coloured at the smallest size, so the colour is the "safe to speak" cue. Transcribing:
   a soft pulse travels left to right. Error: text flash in the error colour. (A spectrogram was tried first and dropped
   2026-10-14: too faint at headset levels and too busy.)
 - Appears with a 120 ms fade and scale-in, hides with a 150 ms fade. 60 fps while visible, no surface and no rendering when hidden.

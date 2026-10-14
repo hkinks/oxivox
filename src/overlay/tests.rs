@@ -66,20 +66,82 @@ fn body_is_rounded_and_themed() {
 }
 
 #[test]
-fn warming_up_is_a_static_row_of_small_dim_dots() {
-    let mut o = overlay_with_font();
+fn warming_up_is_a_row_of_small_neutral_dots_that_breathe() {
     let now = Instant::now();
-    o.apply(OverlayCmd::Show(View::WarmingUp), now);
-    let first = snapshot("warming-up", &o, now + SETTLED, 1.0);
-    o.tick(now + Duration::from_millis(700));
-    let later = snapshot("warming-up-later", &o, now + Duration::from_millis(700), 1.0);
-    assert_eq!(first.data(), later.data(), "nothing moves while warming up");
+    let o = warming_up(now);
+    let dim = snapshot("warming-up", &o, now + SETTLED, 1.0);
+    let bright = snapshot("warming-up-breath", &o, now + Duration::from_millis(1200), 1.0);
     let theme = Theme::default();
     // Dots exist at the expected places, between them it is background.
-    assert!(distance(pixel(&first, dot_x(0), 28), theme.background) > 40);
-    assert!(distance(pixel(&first, dot_x(0) + 8, 28), theme.background) < 12);
+    assert!(distance(pixel(&dim, dot_x(0), 28), theme.background) > 40);
+    assert!(distance(pixel(&dim, dot_x(0) + 8, 28), theme.background) < 12);
     // ...and they are small: nothing above or below the centre line.
-    assert!(distance(pixel(&first, dot_x(0), 20), theme.background) < 12);
+    assert!(distance(pixel(&bright, dot_x(0), 20), theme.background) < 12);
+    // The breath changes only the opacity, and the colour stays the neutral text colour, never the accent.
+    let (a, b) = (
+        distance(pixel(&dim, dot_x(0), 28), theme.background),
+        distance(pixel(&bright, dot_x(0), 28), theme.background),
+    );
+    assert!(b > a + 20, "breath brightens the dot ({a} -> {b})");
+    // Taking the opacity from the red channel, the other channels match the text colour, not the accent.
+    let p = pixel(&bright, dot_x(0), 28);
+    let (bg, t) = (theme.background, theme.text);
+    let a = (p[0] as f32 - bg.r as f32) / (t.r as f32 - bg.r as f32);
+    let expected_green = bg.g as f32 + a * (t.g as f32 - bg.g as f32);
+    assert!((p[1] as f32 - expected_green).abs() < 6.0, "warming up is neutral text colour ({p:?})");
+}
+
+fn warming_up(now: Instant) -> Overlay {
+    let mut o = overlay_with_font();
+    o.apply(OverlayCmd::Show(View::WarmingUp), now);
+    o
+}
+
+/// Warming up, then the microphone goes live; returns the overlay and that moment.
+fn going_live(now: Instant) -> (Overlay, Instant) {
+    let mut o = warming_up(now);
+    let live = now + Duration::from_millis(1500);
+    o.apply(OverlayCmd::Show(View::Recording), live);
+    (o, live)
+}
+
+#[test]
+fn going_live_pings_outward_once_and_turns_the_dots_to_the_accent() {
+    let now = Instant::now();
+    let (o, live) = going_live(now);
+    let theme = Theme::default();
+    let before = snapshot("live-before", &warming_up(now), live, 1.0);
+    let tall_at = |pm: &Pixmap, i: i32| distance(pixel(pm, dot_x(i), 28 - 4), theme.background) > 40;
+
+    // Early in the ping the dots next to the centre have grown; the outer dots have not been reached.
+    let early = snapshot("live-ping-early", &o, live + Duration::from_millis(40), 1.0);
+    assert!((tall_at(&early, 1) || tall_at(&early, 2)) && !tall_at(&early, 8));
+    // Mid-way the front is away from the centre, on both sides equally, and the centre is back down.
+    let mid = snapshot("live-ping-mid", &o, live + Duration::from_millis(150), 1.0);
+    assert!(tall_at(&mid, 4) && tall_at(&mid, -4) && !tall_at(&mid, 0) && !tall_at(&mid, 9));
+    // After it the row is calm again, every dot the accent colour at base size.
+    let after = snapshot("live-silent", &o, live + Duration::from_millis(600), 1.0);
+    for i in -9..=9 {
+        assert!(!tall_at(&after, i), "dot {i} still big after the ping");
+        let p = pixel(&after, dot_x(i), 28);
+        assert!(distance(p, theme.accent) < 40, "dot {i} is accent ({p:?})");
+    }
+    // Before going live they were neutral.
+    assert!(distance(pixel(&before, dot_x(0), 28), theme.accent) > 100);
+    // The ping happens once: later frames are identical.
+    let later = snapshot("live-silent-later", &o, live + Duration::from_millis(900), 1.0);
+    assert_eq!(after.data(), later.data());
+}
+
+#[test]
+fn repeated_recording_commands_do_not_ping_again() {
+    let now = Instant::now();
+    let (mut o, live) = going_live(now);
+    let late = live + Duration::from_millis(800);
+    let a = snapshot("live-no-reping-a", &o, late, 1.0);
+    o.apply(OverlayCmd::Show(View::Recording), late);
+    let b = snapshot("live-no-reping-b", &o, late, 1.0);
+    assert_eq!(a.data(), b.data());
 }
 
 #[test]

@@ -12,6 +12,18 @@ const DOT_MIN_RADIUS: f32 = 2.4;
 const DOT_MAX_RADIUS: f32 = 7.2;
 /// Wave period while transcribing.
 const WAVE_SECS: f32 = 1.6;
+/// Breathing period while warming up.
+const BREATH_SECS: f32 = 2.4;
+/// Opacity of the neutral dots at the dimmest and brightest point of the breath.
+const BREATH_ALPHA: (f32, f32) = (0.22, 0.42);
+/// How long the dots take to turn from the neutral colour to the accent when the mic goes live.
+const LIVE_TINT_SECS: f32 = 0.12;
+/// The ping runs outward from the centre dot once, this long.
+pub const PING_SECS: f32 = 0.32;
+/// Width of the ping front, in dots.
+const PING_WIDTH: f32 = 1.5;
+/// Extra dot size at the ping front.
+const PING_GAIN: f32 = 0.7;
 const FLASH_DOT_X: f32 = 22.0;
 const TEXT_LEFT: f32 = 40.0;
 const TEXT_RIGHT_MARGIN: f32 = 14.0;
@@ -26,6 +38,8 @@ pub struct Scene<'a> {
     pub dots: &'a [f32; HALF],
     /// Seconds since the overlay appeared, drives the animations.
     pub time: f32,
+    /// Seconds since the microphone went live; `None` while it has not (or the view is not recording).
+    pub live: Option<f32>,
     pub font: Option<&'a Font>,
 }
 
@@ -78,12 +92,24 @@ pub fn render(pixmap: &mut Pixmap, scene: &Scene) {
 
     match scene.view {
         View::Hidden => {}
-        View::WarmingUp => draw_row(pixmap, tf, w, h, |_| (0.0, theme.text.with_alpha(0.28))),
-        View::Recording => draw_row(pixmap, tf, w, h, |i| {
-            let v = scene.dots[i.abs_diff(HALF - 1)];
-            let colour = theme.accent.mix(theme.text, ((v - 0.7) / 0.3).clamp(0.0, 1.0) * 0.6);
-            (v, colour.with_alpha(0.3 + 0.7 * v.sqrt()))
-        }),
+        View::WarmingUp => {
+            let breath = 0.5 - 0.5 * (std::f32::consts::TAU * scene.time / BREATH_SECS).cos();
+            let alpha = BREATH_ALPHA.0 + (BREATH_ALPHA.1 - BREATH_ALPHA.0) * breath;
+            draw_row(pixmap, tf, w, h, |_| (0.0, theme.text.with_alpha(alpha)))
+        }
+        View::Recording => {
+            let live = scene.live.unwrap_or(f32::MAX);
+            let tint = (live / LIVE_TINT_SECS).clamp(0.0, 1.0);
+            let neutral = theme.text.with_alpha(BREATH_ALPHA.1);
+            draw_row(pixmap, tf, w, h, |i| {
+                let d = i.abs_diff(HALF - 1);
+                let v = scene.dots[d].max(ping(live, d));
+                // Loud dots pale towards the text colour; silent ones stay a clear accent.
+                let accent = theme.accent.mix(theme.text, ((v - 0.7) / 0.3).clamp(0.0, 1.0) * 0.6);
+                let colour = neutral.mix(accent, tint).with_alpha(0.92 + 0.08 * v.sqrt());
+                (v, colour)
+            })
+        }
         View::Transcribing => draw_row(pixmap, tf, w, h, |i| {
             // A pulse travelling from left to right through the row.
             let phase = scene.time / WAVE_SECS - i as f32 / (2 * HALF - 1) as f32;
@@ -112,6 +138,17 @@ pub fn render(pixmap: &mut Pixmap, scene: &Scene) {
             }
         }
     }
+}
+
+/// Size boost 0..1 of the dot `d` places from the centre, `live` seconds after the microphone went live.
+fn ping(live: f32, d: usize) -> f32 {
+    if live >= PING_SECS {
+        return 0.0;
+    }
+    let progress = live / PING_SECS;
+    let front = progress * (HALF as f32 + PING_WIDTH);
+    let x = (d as f32 - front) / PING_WIDTH;
+    PING_GAIN * (-x * x).exp() * (1.0 - progress)
 }
 
 /// The row of dots; `style` gives the size 0..1 and colour of dot `i` counted from the left.

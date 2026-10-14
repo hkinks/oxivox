@@ -10,6 +10,10 @@ use crate::paths;
 use crate::platform::wayland::LayerShellSurface;
 use crate::theme::Theme;
 
+/// Warming up as with a Bluetooth headset switching to call mode.
+const WARMUP_MS: u64 = 2000;
+const SILENCE_MS: u64 = 1500;
+
 /// Syllable-like bursts with pauses, at the level of headset speech in call mode (peaks around -15 dBFS).
 fn voice(sample: usize) -> f32 {
     let t = sample as f32 / SAMPLE_RATE as f32;
@@ -28,8 +32,10 @@ pub fn run(record_secs: f32) -> Result<()> {
     let sink = Box::new(LayerShellSurface).spawn(Overlay::new(config.overlay, theme, text::load_system_font()))?;
 
     sink.send(OverlayCmd::Show(View::WarmingUp));
-    std::thread::sleep(Duration::from_millis(1200));
+    std::thread::sleep(Duration::from_millis(WARMUP_MS));
     sink.send(OverlayCmd::Show(View::Recording));
+    // Silence first, so the live ping and the quiet accent-coloured row can be seen before the voice starts.
+    std::thread::sleep(Duration::from_millis(SILENCE_MS));
 
     let mut meter = FrameMeter::default();
     let mut sample = 0;

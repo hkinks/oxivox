@@ -75,6 +75,8 @@ pub struct Overlay {
     view: View,
     dots: Dots,
     shown_at: Instant,
+    /// When the view last became `Recording`, i.e. the microphone went live.
+    live_at: Option<Instant>,
     fade: Fade,
     /// The view stays on screen, fading out, until the fade ends.
     hiding: bool,
@@ -90,6 +92,7 @@ impl Overlay {
             view: View::Hidden,
             dots: Dots::default(),
             shown_at: Instant::now(),
+            live_at: None,
             fade: Fade { from: 0.0, to: 0.0, start: Instant::now(), duration: FADE_IN },
             hiding: false,
             flash_until: None,
@@ -122,6 +125,9 @@ impl Overlay {
                     self.fade = Fade { from: self.opacity(now), to: 1.0, start: now, duration: FADE_IN };
                     self.hiding = false;
                 }
+                // Going live is the change into recording; further `Recording` commands keep the original moment.
+                let was_recording = self.view == View::Recording;
+                self.live_at = (view == View::Recording).then(|| self.live_at.filter(|_| was_recording).unwrap_or(now));
                 self.flash_until = matches!(view, View::Flash(_)).then(|| now + FLASH_DURATION);
                 self.view = view;
             }
@@ -163,6 +169,7 @@ impl Overlay {
             view: &self.view,
             dots: self.dots.sizes(),
             time: now.saturating_duration_since(self.shown_at).as_secs_f32(),
+            live: self.live_at.map(|t| now.saturating_duration_since(t).as_secs_f32()),
             font: self.font.as_ref(),
         };
         let opacity = self.opacity(now);
