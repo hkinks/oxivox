@@ -1,0 +1,70 @@
+//! Trigger for compositors without a global-shortcut API: the user binds a key to `wisprs toggle`,
+//! which reaches the daemon over a Unix socket.
+
+use anyhow::{Context, Result, bail};
+use std::io::{BufRead, BufReader, Write};
+use std::os::unix::net::{UnixListener, UnixStream};
+use std::path::PathBuf;
+use std::sync::mpsc;
+use std::time::Duration;
+
+use super::Trigger;
+use crate::ipc::{Command, Request};
+
+pub struct SocketTrigger {
+    listener: UnixListener,
+}
+
+/// Removes the socket file when the daemon exits.
+pub struct SocketGuard(PathBuf);
+
+impl Drop for SocketGuard {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+impl SocketTrigger {
+    /// Binds the socket now, so a second daemon is refused before any model gets loaded.
+    pub fn bind(path: PathBuf) -> Result<(Self, SocketGuard)> {
+        if path.exists() {
+            if UnixStream::connect(&path).is_ok() {
+                bail!("another wisprs daemon is already listening on {}", path.display());
+            }
+            std::fs::remove_file(&path).context("removing stale socket")?;
+        }
+        let listener = UnixListener::bind(&path).with_context(|| format!("binding {}", path.display()))?;
+        Ok((Self { listener }, SocketGuard(path)))
+    }
+}
+
+fn serve_connection(stream: UnixStream, on_request: &(dyn Fn(Request) + Send)) -> Result<()> {
+    stream.set_read_timeout(Some(Duration::from_secs(2)))?;
+    let mut line = String::new();
+    BufReader::new(&stream).read_line(&mut line)?;
+    let mut stream = stream;
+    let Some(command) = Command::parse(&line) else {
+        writeln!(stream, "error: unknown command {:?}", line.trim())?;
+        return Ok(());
+    };
+    let (reply, answer) = mpsc::channel();
+    on_request(Request { command, reply });
+    match answer.recv_timeout(Duration::from_secs(5)) {
+        Ok(text) => writeln!(stream, "{text}")?,
+        Err(_) => writeln!(stream, "error: daemon did not answer")?,
+    }
+    Ok(())
+}
+
+impl Trigger for SocketTrigger {
+    fn spawn(self: Box<Self>, on_request: Box<dyn Fn(Request) + Send>) -> Result<()> {
+        std::thread::Builder::new().name("socket-trigger".into()).spawn(move || {
+            for stream in self.listener.incoming().flatten() {
+                if let Err(e) = serve_connection(stream, &*on_request) {
+                    tracing::warn!("socket request failed: {e:#}");
+                }
+            }
+        })?;
+        Ok(())
+    }
+}
