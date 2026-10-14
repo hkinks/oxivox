@@ -25,6 +25,8 @@
       ];
       runtimeTools = with pkgs; [ wl-clipboard playerctl fontconfig ];
     in {
+      packages.${system}.rustle = self.packages.${system}.default;
+
       packages.${system}.default = pkgs.rustPlatform.buildRustPackage {
         pname = "rustle-dictation";
         version = "0.1.0";
