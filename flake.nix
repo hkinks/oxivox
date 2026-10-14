@@ -25,24 +25,25 @@
       ];
       runtimeTools = with pkgs; [ wl-clipboard playerctl fontconfig ];
     in {
-      packages.${system}.rustle = self.packages.${system}.default;
-
-      packages.${system}.default = pkgs.rustPlatform.buildRustPackage {
-        pname = "rustle-dictation";
-        version = "0.1.0";
-        src = self;
-        cargoLock.lockFile = ./Cargo.lock;
-        inherit buildInputs;
-        # cmake is only used by whisper-rs's build script, not as the package's own build system
-        dontUseCmakeConfigure = true;
-        doCheck = false;
-        postFixup = ''
-          wrapProgram $out/bin/rustle \
-            --prefix PATH : ${pkgs.lib.makeBinPath runtimeTools} \
-            --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath [ pkgs.vulkan-loader pkgs.wayland pkgs.libxkbcommon ]}
-        '';
-        nativeBuildInputs = nativeBuildInputs ++ [ pkgs.makeWrapper ];
-        meta.mainProgram = "rustle";
+      packages.${system} = rec {
+        rustle = pkgs.rustPlatform.buildRustPackage {
+          pname = "rustle-dictation";
+          version = "0.1.0";
+          src = self;
+          cargoLock.lockFile = ./Cargo.lock;
+          inherit buildInputs;
+          # cmake is only used by whisper-rs's build script, not as the package's own build system
+          dontUseCmakeConfigure = true;
+          doCheck = false;
+          postFixup = ''
+            wrapProgram $out/bin/rustle \
+              --prefix PATH : ${pkgs.lib.makeBinPath runtimeTools} \
+              --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath [ pkgs.vulkan-loader pkgs.wayland pkgs.libxkbcommon ]}
+          '';
+          nativeBuildInputs = nativeBuildInputs ++ [ pkgs.makeWrapper ];
+          meta.mainProgram = "rustle";
+        };
+        default = rustle;
       };
 
       devShells.${system}.default = pkgs.mkShell {
