@@ -59,6 +59,24 @@ impl Engine for FakeEngine {
     }
 }
 
+/// An engine whose warm-up takes as long as the test lets it.
+struct SlowWarmEngine {
+    warm_up_gate: Receiver<()>,
+    calls: Log,
+}
+impl Engine for SlowWarmEngine {
+    fn transcribe(&mut self, audio: &[f32], _: &Arc<AtomicBool>) -> Result<String> {
+        self.calls.lock().unwrap().push(format!("engine {} samples", audio.len()));
+        Ok("Hello".into())
+    }
+    fn warm_up(&mut self) -> Result<()> {
+        self.calls.lock().unwrap().push("warm-up start".into());
+        let _ = self.warm_up_gate.recv();
+        self.calls.lock().unwrap().push("warm-up done".into());
+        Ok(())
+    }
+}
+
 struct Harness {
     daemon: Daemon,
     messages: Receiver<Msg>,
@@ -68,6 +86,11 @@ struct Harness {
 
 fn harness(engine_reply: &'static str) -> Harness {
     let log: Log = Arc::default();
+    let engine = Box::new(FakeEngine { reply: engine_reply, calls: log.clone() });
+    harness_with(log, engine)
+}
+
+fn harness_with(log: Log, engine: Box<dyn Engine>) -> Harness {
     let overlay = Arc::new(FakeOverlay(Mutex::default()));
     let platform = Platform {
         capture: Box::new(FakeCapture(log.clone())),
@@ -77,7 +100,6 @@ fn harness(engine_reply: &'static str) -> Harness {
         media: Box::new(FakeMedia(log.clone())),
         cancel_key: None,
     };
-    let engine = Box::new(FakeEngine { reply: engine_reply, calls: log.clone() });
     let (daemon, messages) = Daemon::new(Config::default(), platform, engine);
     Harness { daemon, messages, log, overlay }
 }
@@ -232,4 +254,30 @@ fn max_length_stops_and_transcribes() {
     assert_eq!(h.request(Command::Status), "transcribing");
     h.pump_result();
     assert!(h.log().contains(&"paste \"Long text\" into 0x1".to_string()));
+}
+
+#[test]
+fn dictation_during_engine_warm_up_records_now_and_transcribes_after_it() {
+    let log: Log = Arc::default();
+    let (release, warm_up_gate) = mpsc::channel();
+    let mut h = harness_with(log.clone(), Box::new(SlowWarmEngine { warm_up_gate, calls: log }));
+
+    // The warm-up is still running: recording starts and stops as usual.
+    assert_eq!(h.request(Command::Toggle), "warming-up");
+    h.tone(1.0);
+    assert_eq!(h.request(Command::Status), "recording");
+    assert_eq!(h.request(Command::Toggle), "transcribing");
+    assert!(matches!(h.views().last(), Some(View::Transcribing)));
+
+    // No result while the engine thread is busy warming up, and nothing is pasted.
+    assert!(h.messages.recv_timeout(Duration::from_millis(300)).is_err());
+    assert!(!h.log().iter().any(|l| l.starts_with("engine") || l.starts_with("paste")));
+
+    release.send(()).unwrap();
+    h.pump_result();
+    assert_eq!(h.request(Command::Status), "idle");
+    let log = h.log();
+    let position = |entry: &str| log.iter().position(|l| l == entry).unwrap_or_else(|| panic!("{entry} in {log:?}"));
+    assert!(position("warm-up done") < position("engine 16000 samples"));
+    assert!(position("engine 16000 samples") < position("paste \"Hello\" into 0x1"));
 }

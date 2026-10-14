@@ -21,7 +21,7 @@ pub fn data_dir() -> PathBuf {
     xdg("XDG_DATA_HOME", ".local/share")
 }
 
-/// `$RUSTLE_SOCKET` overrides the default, e.g. to run a second daemon for testing.
+/// `$RUSTLE_SOCKET` overrides the default; the `--socket` option overrides both.
 pub fn socket_path() -> PathBuf {
     if let Some(path) = std::env::var_os("RUSTLE_SOCKET") {
         return PathBuf::from(path);

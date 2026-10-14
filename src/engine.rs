@@ -33,14 +33,20 @@ pub struct WhisperEngine {
 }
 
 impl WhisperEngine {
-    pub fn load(model: &Path, language: Option<&str>, gpu: bool) -> Result<Self> {
-        let devices = whisper_rs::vulkan::list_devices();
+    /// `gpu_fallback_cpu`: when the GPU lacks the memory for the model, run on the CPU instead of failing.
+    pub fn load(model: &Path, language: Option<&str>, gpu: bool, gpu_fallback_cpu: bool) -> Result<Self> {
+        let mut gpu = gpu;
         if gpu {
+            let devices = whisper_rs::vulkan::list_devices();
             let Some(device) = devices.first() else {
                 bail!("no Vulkan device found; set `gpu = false` in the config to run on the CPU");
             };
-            tracing::info!(gpu = %device.name, vram_free_mb = device.vram.free >> 20, "loading {}", model.display());
-        } else {
+            let free = device.vram.free as u64;
+            tracing::info!(gpu = %device.name, vram_free_mb = free >> 20, "loading {}", model.display());
+            let model_bytes = std::fs::metadata(model).with_context(|| model.display().to_string())?.len();
+            gpu = choose_device(free, model_bytes, gpu_fallback_cpu)?;
+        }
+        if !gpu {
             tracing::info!("loading {} for the CPU", model.display());
         }
         let mut params = WhisperContextParameters::default();
@@ -54,6 +60,27 @@ impl WhisperEngine {
         let threads = if gpu { 4 } else { std::thread::available_parallelism().map_or(4, |n| n.get().min(8)) as i32 };
         Ok(Self { _ctx: ctx, state, language: language.map(String::from), threads, beam: 5 })
     }
+}
+
+/// Device memory beyond the model file that whisper.cpp allocates: compute buffers, KV cache, the state.
+const GPU_BUFFER_BYTES: u64 = 250 << 20;
+
+/// Whether to run on the GPU. ggml aborts the whole process when Vulkan runs out of device memory, so the
+/// check happens before the model is loaded: not enough free memory means the CPU (when allowed) or an error.
+fn choose_device(free: u64, model_bytes: u64, fallback_cpu: bool) -> Result<bool> {
+    let needed = model_bytes + GPU_BUFFER_BYTES;
+    if free >= needed {
+        return Ok(true);
+    }
+    let (free_mb, needed_mb) = (free >> 20, needed >> 20);
+    if fallback_cpu {
+        tracing::warn!(free_mb, needed_mb, "not enough free GPU memory for the model; falling back to the CPU");
+        return Ok(false);
+    }
+    bail!(
+        "not enough free GPU memory for the model: {free_mb} MB free, about {needed_mb} MB needed. \
+         Free some GPU memory, or set `gpu_fallback_cpu = true` (slow) or `gpu = false` in the config"
+    )
 }
 
 impl WhisperEngine {
@@ -119,4 +146,30 @@ impl Engine for WhisperEngine {
 fn set_abort(params: &mut FullParams, callback: impl FnMut() -> bool + 'static) {
     type Callback = Box<dyn FnMut() -> bool>;
     params.set_abort_callback_safe::<Option<Callback>, Callback>(Some(Box::new(callback)));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const MODEL: u64 = 1600 << 20;
+
+    #[test]
+    fn enough_free_memory_uses_the_gpu() {
+        assert!(choose_device(MODEL + GPU_BUFFER_BYTES, MODEL, false).unwrap());
+        assert!(choose_device(8 << 30, MODEL, true).unwrap());
+    }
+
+    #[test]
+    fn too_little_memory_is_an_error_naming_the_numbers() {
+        let message = choose_device(1400 << 20, MODEL, false).unwrap_err().to_string();
+        assert!(message.contains("1400 MB free"), "{message}");
+        assert!(message.contains("1850 MB needed"), "{message}");
+        assert!(message.contains("gpu_fallback_cpu"), "{message}");
+    }
+
+    #[test]
+    fn too_little_memory_falls_back_to_the_cpu_when_allowed() {
+        assert!(!choose_device(1400 << 20, MODEL, true).unwrap());
+    }
 }

@@ -31,6 +31,9 @@ use crate::theme::Theme;
 #[derive(Parser)]
 #[command(version, about = "Dictation: press a key, speak, press again, the text appears in the app you were in")]
 struct Cli {
+    /// Socket of the daemon (default: $XDG_RUNTIME_DIR/rustle.sock); lets a test daemon run beside the real one
+    #[arg(long, global = true, value_name = "PATH")]
+    socket: Option<PathBuf>,
     #[command(subcommand)]
     command: Action,
 }
@@ -97,20 +100,22 @@ fn main() -> Result<()> {
         .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "rustle=info".into()))
         .with_writer(std::io::stderr)
         .init();
-    match Cli::parse().command {
-        Action::Daemon { dry_run } => run_daemon(dry_run),
+    let cli = Cli::parse();
+    let socket = cli.socket.unwrap_or_else(paths::socket_path);
+    match cli.command {
+        Action::Daemon { dry_run } => run_daemon(dry_run, socket),
         Action::PasteTest { text, window } => paste_test(&text, window.as_deref()),
         Action::OverlayDemo { seconds } => demo::run(seconds),
         Action::Bench { file, runs, pause, language, beam } => bench(&file, runs, pause, language, beam),
-        Action::Toggle => client(Command::Toggle),
-        Action::Cancel => client(Command::Cancel),
-        Action::Status => client(Command::Status),
+        Action::Toggle => client(&socket, Command::Toggle),
+        Action::Cancel => client(&socket, Command::Cancel),
+        Action::Status => client(&socket, Command::Status),
         Action::Transcribe { file, model, language, cpu } => transcribe(file, model, language, !cpu),
     }
 }
 
-fn client(command: Command) -> Result<()> {
-    println!("{}", ipc::send(&paths::socket_path(), command)?);
+fn client(socket: &std::path::Path, command: Command) -> Result<()> {
+    println!("{}", ipc::send(socket, command)?);
     Ok(())
 }
 
@@ -123,7 +128,7 @@ fn transcribe(file: PathBuf, model: Option<PathBuf>, language: Option<String>, g
     let language = language.unwrap_or_else(|| config.language.clone());
     let language = (language != "auto" && !language.is_empty()).then_some(language);
     let audio = audio::read_wav(&file)?;
-    let mut engine = WhisperEngine::load(&model, language.as_deref(), gpu && config.gpu)?;
+    let mut engine = WhisperEngine::load(&model, language.as_deref(), gpu && config.gpu, config.gpu_fallback_cpu)?;
     let raw = engine.transcribe(&audio, &Default::default())?;
     println!("{}", tokens::clean(&raw));
     Ok(())
@@ -142,12 +147,12 @@ fn paste_test(text: &str, window: Option<&str>) -> Result<()> {
     Ok(())
 }
 
-fn run_daemon(dry_run: bool) -> Result<()> {
+fn run_daemon(dry_run: bool, socket: PathBuf) -> Result<()> {
     let config = Config::load_default()?;
     let model = config.model_path()?;
-    let (trigger, _socket_guard) = SocketTrigger::bind(paths::socket_path())?;
+    let (trigger, _socket_guard) = SocketTrigger::bind(socket.clone())?;
 
-    let engine = WhisperEngine::load(&model, config.language_code(), config.gpu)?;
+    let engine = WhisperEngine::load(&model, config.language_code(), config.gpu, config.gpu_fallback_cpu)?;
     tracing::info!("model loaded");
 
     let hypr = Hyprland::from_env()?;
@@ -183,7 +188,7 @@ fn run_daemon(dry_run: bool) -> Result<()> {
             let _ = inbox.send(daemon::Msg::Request(request));
         }))
         .context("starting the trigger")?;
-    tracing::info!("ready on {}", paths::socket_path().display());
+    tracing::info!("ready on {}", socket.display());
     daemon.run(messages);
     Ok(())
 }
@@ -193,7 +198,7 @@ fn bench(file: &std::path::Path, runs: u32, pause: u64, language: Option<String>
     let audio = audio::read_wav(file)?;
     let language = language.filter(|l| l != "auto");
     let started = std::time::Instant::now();
-    let mut engine = WhisperEngine::load(&config.model_path()?, language.as_deref(), true)?;
+    let mut engine = WhisperEngine::load(&config.model_path()?, language.as_deref(), true, config.gpu_fallback_cpu)?;
     engine.beam = beam;
     eprintln!("load: {:.2}s, audio {:.1}s", started.elapsed().as_secs_f32(), audio.len() as f32 / 16000.0);
     for run in 1..=runs {

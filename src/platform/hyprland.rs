@@ -110,18 +110,37 @@ fn save_clipboard() -> Option<SavedClipboard> {
 }
 
 /// `wl-copy` forks into the background to serve the selection; waiting only waits for that fork.
-fn wl_copy(mime: Option<&str>, data: &[u8]) -> Result<()> {
-    let mut command = Command::new("wl-copy");
-    if let Some(mime) = mime {
-        command.args(["--type", mime]);
+/// `sensitive` asks clipboard managers not to record the content (wl-clipboard 2.2+; older versions reject the
+/// option, in which case the copy is repeated without it).
+fn wl_copy(mime: Option<&str>, data: &[u8], sensitive: bool) -> Result<()> {
+    let attempt = |sensitive: bool| -> Result<bool> {
+        let mut command = Command::new("wl-copy");
+        if sensitive {
+            command.arg("--sensitive");
+        }
+        if let Some(mime) = mime {
+            command.args(["--type", mime]);
+        }
+        let mut child = command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .context("running wl-copy")?;
+        // A rejected option makes wl-copy exit before reading, which breaks the pipe.
+        let _ = child.stdin.take().context("wl-copy stdin")?.write_all(data);
+        Ok(child.wait()?.success())
+    };
+    if attempt(sensitive)? {
+        return Ok(());
     }
-    let mut child =
-        command.stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().context("running wl-copy")?;
-    child.stdin.take().context("wl-copy stdin")?.write_all(data)?;
-    if !child.wait()?.success() {
-        bail!("wl-copy failed");
+    if sensitive {
+        tracing::warn!("wl-copy rejected --sensitive; the text may reach clipboard history");
+        if attempt(false)? {
+            return Ok(());
+        }
     }
-    Ok(())
+    bail!("wl-copy failed")
 }
 
 pub struct HyprlandOutput {
@@ -138,7 +157,7 @@ impl HyprlandOutput {
 impl Output for HyprlandOutput {
     fn deliver(&self, text: &str, target: Option<&Window>) -> Result<()> {
         let saved = save_clipboard();
-        wl_copy(Some("text/plain;charset=utf-8"), text.as_bytes())?;
+        wl_copy(Some("text/plain;charset=utf-8"), text.as_bytes(), true)?;
 
         let current = self.hypr.active().ok().flatten();
         let target = target.filter(|w| self.hypr.find_window(&w.id).is_some()).cloned().or(current.clone());
@@ -153,7 +172,7 @@ impl Output for HyprlandOutput {
         std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(500));
             let restored = match &saved {
-                Some(clip) => wl_copy(Some(&clip.mime), &clip.data),
+                Some(clip) => wl_copy(Some(&clip.mime), &clip.data, false),
                 None => Command::new("wl-copy").arg("--clear").status().map(|_| ()).map_err(Into::into),
             };
             if let Err(e) = restored {

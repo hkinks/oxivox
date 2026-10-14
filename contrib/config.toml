@@ -3,6 +3,7 @@
 language = "auto"
 max_length_secs = 300
 gpu = true
+gpu_fallback_cpu = false                    # too little free GPU memory for the model: use the CPU instead of exiting
 media_ignore = []                              # players never paused while recording, e.g. ["vlc"]
 # source = "alsa_input.usb-..."                # PipeWire node name of the microphone; default: the default source
 # cancel_submap = "rustle"                     # see hyprland.conf
@@ -16,6 +17,6 @@ radius = 12.0
 [paste]
 keys = "CTRL"
 terminal_keys = "CTRL SHIFT"
-terminal_classes = ["ghostty", "alacritty", "kitty", "foot", "konsole", "terminal", "wezterm"]
+terminal_classes = ["ghostty", "kitty", "alacritty", "foot", "konsole", "wezterm", "gnome-terminal", "org.gnome.terminal", "xterm"]
 # [paste.classes]
 # "emacs" = "ALT"
