@@ -3,6 +3,7 @@
 language = "auto"
 max_length_secs = 300
 gpu = true
+# source = "alsa_input.usb-..."                # PipeWire node name of the microphone; default: the default source
 # cancel_submap = "rustle"                     # see hyprland.conf
 
 [overlay]

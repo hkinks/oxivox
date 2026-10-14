@@ -26,7 +26,7 @@ use crate::platform::media::Playerctl;
 use crate::platform::pipewire::PipewireCapture;
 use crate::platform::trigger::SocketTrigger;
 use crate::platform::wayland::LayerShellSurface;
-use crate::platform::{CancelKey, Trigger};
+use crate::platform::{CancelKey, LogOutput, Output, Trigger};
 use crate::theme::Theme;
 
 #[derive(Parser)]
@@ -39,7 +39,11 @@ struct Cli {
 #[derive(Subcommand)]
 enum Action {
     /// Run the daemon: overlay, microphone, speech engine
-    Daemon,
+    Daemon {
+        /// Log the transcript instead of pasting it
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Start recording, or stop and paste when already recording
     Toggle,
     /// Discard the current recording or transcription
@@ -51,6 +55,14 @@ enum Action {
     OverlayDemo {
         #[arg(long, default_value_t = 6.0)]
         seconds: f32,
+    },
+    /// Paste text into a window the way the daemon does
+    #[command(hide = true)]
+    PasteTest {
+        text: String,
+        /// Hyprland window address; the focused window when omitted
+        #[arg(long)]
+        window: Option<String>,
     },
     /// Transcribe a WAV file and print the text
     Transcribe {
@@ -73,7 +85,8 @@ fn main() -> Result<()> {
         .with_writer(std::io::stderr)
         .init();
     match Cli::parse().command {
-        Action::Daemon => run_daemon(),
+        Action::Daemon { dry_run } => run_daemon(dry_run),
+        Action::PasteTest { text, window } => paste_test(&text, window.as_deref()),
         Action::OverlayDemo { seconds } => demo::run(seconds),
         Action::Toggle => client(Command::Toggle),
         Action::Cancel => client(Command::Cancel),
@@ -102,7 +115,20 @@ fn transcribe(file: PathBuf, model: Option<PathBuf>, language: Option<String>, g
     Ok(())
 }
 
-fn run_daemon() -> Result<()> {
+fn paste_test(text: &str, window: Option<&str>) -> Result<()> {
+    let config = Config::load_default()?;
+    let hypr = Hyprland::from_env()?;
+    let target = match window {
+        Some(address) => Some(hypr.find_window(address).with_context(|| format!("no window {address}"))?),
+        None => None,
+    };
+    HyprlandOutput::new(hypr, config.paste).deliver(text, target.as_ref())?;
+    // The clipboard is restored from a background thread.
+    std::thread::sleep(std::time::Duration::from_millis(700));
+    Ok(())
+}
+
+fn run_daemon(dry_run: bool) -> Result<()> {
     let config = Config::load_default()?;
     let model = config.model_path()?;
     let (trigger, _socket_guard) = SocketTrigger::bind(paths::socket_path())?;
@@ -122,15 +148,17 @@ fn run_daemon() -> Result<()> {
         tracing::warn!("theme changes will not be picked up: {e:#}");
     }
 
-    let cancel_key = config
-        .cancel_submap
-        .clone()
-        .map(|name| Box::new(SubmapCancel::new(hypr.clone(), name)) as Box<dyn CancelKey>);
+    let cancel_key =
+        config.cancel_submap.clone().map(|name| Box::new(SubmapCancel::new(hypr.clone(), name)) as Box<dyn CancelKey>);
     let platform = daemon::Platform {
-        capture: Box::new(PipewireCapture::default()),
+        capture: Box::new(PipewireCapture::new(config.source.clone())),
         overlay: sink,
         focus: Box::new(hypr.clone()),
-        output: std::sync::Arc::new(HyprlandOutput::new(hypr, config.paste.clone())),
+        output: if dry_run {
+            std::sync::Arc::new(LogOutput)
+        } else {
+            std::sync::Arc::new(HyprlandOutput::new(hypr, config.paste.clone()))
+        },
         media: Box::new(Playerctl::default()),
         cancel_key,
     };

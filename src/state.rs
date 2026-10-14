@@ -91,7 +91,9 @@ pub fn step(state: State, event: Event) -> (State, Vec<Action>) {
 
         (Transcribing, Event::Cancel) => (Idle, vec![CancelTranscription, ResumeMedia, Hide]),
         (Transcribing, Event::Transcribed(Outcome::Text)) => (Idle, vec![Deliver]),
-        (Transcribing, Event::Transcribed(Outcome::Empty)) => (Idle, vec![ResumeMedia, Flash(self::Flash::NothingHeard)]),
+        (Transcribing, Event::Transcribed(Outcome::Empty)) => {
+            (Idle, vec![ResumeMedia, Flash(self::Flash::NothingHeard)])
+        }
         (Transcribing, Event::Transcribed(Outcome::Failed)) => {
             (Idle, vec![ResumeMedia, Flash(self::Flash::TranscriptionFailed)])
         }
@@ -117,17 +119,9 @@ mod tests {
 
     #[test]
     fn happy_path() {
-        let (state, actions) = run(&[
-            Event::Toggle,
-            Event::MicLive,
-            Event::Toggle,
-            Event::Transcribed(Outcome::Text),
-        ]);
+        let (state, actions) = run(&[Event::Toggle, Event::MicLive, Event::Toggle, Event::Transcribed(Outcome::Text)]);
         assert_eq!(state, Idle);
-        assert_eq!(
-            actions,
-            [Begin, ShowRecording, StopCapture, ShowTranscribing, Transcribe, Deliver]
-        );
+        assert_eq!(actions, [Begin, ShowRecording, StopCapture, ShowTranscribing, Transcribe, Deliver]);
     }
 
     #[test]
@@ -139,7 +133,9 @@ mod tests {
 
     #[test]
     fn cancel_from_every_active_state() {
-        for prefix in [&[Event::Toggle][..], &[Event::Toggle, Event::MicLive], &[Event::Toggle, Event::MicLive, Event::Toggle]] {
+        for prefix in
+            [&[Event::Toggle][..], &[Event::Toggle, Event::MicLive], &[Event::Toggle, Event::MicLive, Event::Toggle]]
+        {
             let mut events = prefix.to_vec();
             events.push(Event::Cancel);
             let (state, actions) = run(&events);
@@ -158,12 +154,7 @@ mod tests {
 
     #[test]
     fn empty_result_flashes_and_does_not_deliver() {
-        let (state, actions) = run(&[
-            Event::Toggle,
-            Event::MicLive,
-            Event::Toggle,
-            Event::Transcribed(Outcome::Empty),
-        ]);
+        let (state, actions) = run(&[Event::Toggle, Event::MicLive, Event::Toggle, Event::Transcribed(Outcome::Empty)]);
         assert_eq!(state, Idle);
         assert_eq!(actions.last(), Some(&Flash(self::Flash::NothingHeard)));
         assert!(!actions.contains(&Deliver));
@@ -187,7 +178,12 @@ mod tests {
 
     #[test]
     fn stale_events_are_ignored() {
-        for event in [Event::MicLive, Event::MaxLength, Event::Transcribed(Outcome::Text), Event::MicFailed(MicFailure::NoMicrophone)] {
+        for event in [
+            Event::MicLive,
+            Event::MaxLength,
+            Event::Transcribed(Outcome::Text),
+            Event::MicFailed(MicFailure::NoMicrophone),
+        ] {
             assert_eq!(step(Idle, event), (Idle, vec![]));
         }
         assert_eq!(step(Recording, Event::MicLive), (Recording, vec![]));

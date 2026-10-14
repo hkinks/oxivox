@@ -11,7 +11,7 @@ use crate::config::Config;
 use crate::engine::Engine;
 use crate::ipc::{Command, Request};
 use crate::overlay::{FlashKind, FlashMessage, OverlayCmd, OverlaySink, View};
-use crate::platform::{Capture, CaptureEvent, CancelKey, Focus, Media, Output, Window};
+use crate::platform::{CancelKey, Capture, CaptureEvent, Focus, Media, Output, Window};
 use crate::spectrogram::{Analyzer, SAMPLE_RATE};
 use crate::state::{Action, Event, Flash, MicFailure, Outcome, State, step};
 use crate::tokens;
@@ -145,7 +145,8 @@ impl Daemon {
     fn on_tick(&mut self) {
         match self.state {
             State::WarmingUp if self.recording.started.is_some_and(|t| t.elapsed() > WARM_UP_TIMEOUT) => {
-                let failure = if self.recording.stream_up { MicFailure::NeverStarted } else { MicFailure::NoMicrophone };
+                let failure =
+                    if self.recording.stream_up { MicFailure::NeverStarted } else { MicFailure::NoMicrophone };
                 self.apply(Event::MicFailed(failure));
             }
             State::Recording if self.recording.samples.len() >= self.config.max_length_secs as usize * SAMPLE_RATE => {
@@ -276,7 +277,9 @@ impl Daemon {
         tracing::info!(seconds = audio.len() / SAMPLE_RATE, "transcribing");
         let job = Job { id: self.job_id, audio, cancel: self.job_cancel.clone() };
         if self.jobs.send(job).is_err() {
-            let _ = self.inbox.send(Msg::Transcribed { job: self.job_id, result: Err(anyhow::anyhow!("engine thread is gone")) });
+            let _ = self
+                .inbox
+                .send(Msg::Transcribed { job: self.job_id, result: Err(anyhow::anyhow!("engine thread is gone")) });
         }
     }
 

@@ -16,7 +16,11 @@ fn voice(sample: usize) -> f32 {
     let envelope = (0.5 + 0.5 * (t * 7.0).sin()).powi(2);
     let pitch = 180.0 + 60.0 * (t * 2.3).sin();
     let tau = std::f32::consts::TAU;
-    envelope * 0.15 * ((tau * pitch * t).sin() + 0.6 * (tau * pitch * 3.0 * t).sin() + 0.4 * (tau * (900.0 + 400.0 * (t * 1.7).sin()) * t).sin())
+    envelope
+        * 0.15
+        * ((tau * pitch * t).sin()
+            + 0.6 * (tau * pitch * 3.0 * t).sin()
+            + 0.4 * (tau * (900.0 + 400.0 * (t * 1.7).sin()) * t).sin())
 }
 
 pub fn run(record_secs: f32) -> Result<()> {

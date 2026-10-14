@@ -6,6 +6,9 @@ use smithay_client_toolkit::compositor::{CompositorHandler, CompositorState, Fra
 use smithay_client_toolkit::output::{OutputHandler, OutputState};
 use smithay_client_toolkit::reexports::calloop::{self, EventLoop};
 use smithay_client_toolkit::reexports::calloop_wayland_source::WaylandSource;
+use smithay_client_toolkit::reexports::client::globals::registry_queue_init;
+use smithay_client_toolkit::reexports::client::protocol::{wl_output, wl_shm, wl_surface};
+use smithay_client_toolkit::reexports::client::{Connection, QueueHandle};
 use smithay_client_toolkit::registry::{ProvidesRegistryState, RegistryState};
 use smithay_client_toolkit::shell::WaylandSurface;
 use smithay_client_toolkit::shell::wlr_layer::{
@@ -17,9 +20,6 @@ use smithay_client_toolkit::{delegate_registry, registry_handlers};
 use std::sync::Arc;
 use std::time::Instant;
 use tiny_skia::Pixmap;
-use smithay_client_toolkit::reexports::client::globals::registry_queue_init;
-use smithay_client_toolkit::reexports::client::protocol::{wl_output, wl_shm, wl_surface};
-use smithay_client_toolkit::reexports::client::{Connection, QueueHandle};
 
 use crate::overlay::{Overlay, OverlayCmd, OverlaySink, Surface};
 
@@ -68,9 +68,7 @@ fn setup(overlay: Overlay, commands: calloop::channel::Channel<OverlayCmd>) -> R
     let pool = SlotPool::new(1 << 16, &shm).context("creating shm pool")?;
 
     let event_loop: EventLoop<App> = EventLoop::try_new()?;
-    WaylandSource::new(conn, event_queue)
-        .insert(event_loop.handle())
-        .map_err(|e| anyhow!("{e}"))?;
+    WaylandSource::new(conn, event_queue).insert(event_loop.handle()).map_err(|e| anyhow!("{e}"))?;
     event_loop
         .handle()
         .insert_source(commands, |event, _, app| {
@@ -197,7 +195,13 @@ impl App {
 }
 
 impl CompositorHandler for App {
-    fn scale_factor_changed(&mut self, _: &Connection, _: &QueueHandle<Self>, surface: &wl_surface::WlSurface, factor: i32) {
+    fn scale_factor_changed(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        surface: &wl_surface::WlSurface,
+        factor: i32,
+    ) {
         self.scale = factor.max(1);
         surface.set_buffer_scale(self.scale);
         if self.configured {
@@ -205,7 +209,14 @@ impl CompositorHandler for App {
         }
     }
 
-    fn transform_changed(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &wl_surface::WlSurface, _: wl_output::Transform) {}
+    fn transform_changed(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &wl_surface::WlSurface,
+        _: wl_output::Transform,
+    ) {
+    }
 
     fn frame(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &wl_surface::WlSurface, _: u32) {
         self.frame_pending = false;
@@ -214,9 +225,23 @@ impl CompositorHandler for App {
         }
     }
 
-    fn surface_enter(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &wl_surface::WlSurface, _: &wl_output::WlOutput) {}
+    fn surface_enter(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &wl_surface::WlSurface,
+        _: &wl_output::WlOutput,
+    ) {
+    }
 
-    fn surface_leave(&mut self, _: &Connection, _: &QueueHandle<Self>, _: &wl_surface::WlSurface, _: &wl_output::WlOutput) {}
+    fn surface_leave(
+        &mut self,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+        _: &wl_surface::WlSurface,
+        _: &wl_output::WlOutput,
+    ) {
+    }
 }
 
 impl OutputHandler for App {

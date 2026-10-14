@@ -90,7 +90,8 @@ impl Harness {
     }
 
     fn tone(&mut self, seconds: f32) {
-        let samples = (0..(SAMPLE_RATE as f32 * seconds) as usize).map(|i| 0.2 * (i as f32 * 0.3 + 0.5).sin()).collect();
+        let samples =
+            (0..(SAMPLE_RATE as f32 * seconds) as usize).map(|i| 0.2 * (i as f32 * 0.3 + 0.5).sin()).collect();
         self.daemon.on_capture(CaptureEvent::Samples(samples));
     }
 
@@ -152,14 +153,8 @@ fn leading_silence_is_dropped_and_columns_reach_the_overlay() {
     assert_eq!(h.daemon.recording.samples.len(), 0);
     h.tone(0.5);
     assert_eq!(h.daemon.recording.samples.len(), 8000);
-    let columns: usize = h
-        .overlay
-        .0
-        .lock()
-        .unwrap()
-        .iter()
-        .map(|cmd| if let OverlayCmd::Columns(c) = cmd { c.len() } else { 0 })
-        .sum();
+    let columns: usize =
+        h.overlay.0.lock().unwrap().iter().map(|cmd| if let OverlayCmd::Columns(c) = cmd { c.len() } else { 0 }).sum();
     assert!(columns > 20, "{columns} columns");
 }
 

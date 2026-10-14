@@ -16,6 +16,8 @@ pub struct Config {
     pub max_length_secs: u64,
     /// Run the model on the GPU (Vulkan). CPU is far slower and meant for machines without a usable GPU.
     pub gpu: bool,
+    /// PipeWire node name or serial of the microphone; the default source when unset.
+    pub source: Option<String>,
     pub overlay: OverlayConfig,
     pub paste: PasteConfig,
     /// Hyprland submap that binds Escape to `rustle cancel`; entered while recording or transcribing.
@@ -50,6 +52,7 @@ impl Default for Config {
             language: "auto".into(),
             max_length_secs: 300,
             gpu: true,
+            source: None,
             overlay: OverlayConfig::default(),
             paste: PasteConfig::default(),
             cancel_submap: None,

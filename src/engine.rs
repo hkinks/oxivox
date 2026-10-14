@@ -19,6 +19,7 @@ pub struct WhisperEngine {
     _ctx: WhisperContext,
     state: WhisperState,
     language: Option<String>,
+    threads: i32,
 }
 
 impl WhisperEngine {
@@ -39,7 +40,9 @@ impl WhisperEngine {
             .map_err(|e| anyhow::anyhow!("{e:?}"))
             .with_context(|| format!("loading model {}", model.display()))?;
         let state = ctx.create_state().map_err(|e| anyhow::anyhow!("{e:?}")).context("creating whisper state")?;
-        Ok(Self { _ctx: ctx, state, language: language.map(String::from) })
+        // The GPU does the heavy work; the CPU path wants every core it can get.
+        let threads = if gpu { 4 } else { std::thread::available_parallelism().map_or(4, |n| n.get().min(8)) as i32 };
+        Ok(Self { _ctx: ctx, state, language: language.map(String::from), threads })
     }
 }
 
@@ -57,7 +60,7 @@ impl Engine for WhisperEngine {
 
         let mut params = FullParams::new(SamplingStrategy::BeamSearch { beam_size: 5, patience: -1.0 });
         params.set_language(self.language.as_deref());
-        params.set_n_threads(4);
+        params.set_n_threads(self.threads);
         params.set_translate(false);
         params.set_no_timestamps(true);
         params.set_suppress_blank(true);
@@ -73,11 +76,18 @@ impl Engine for WhisperEngine {
         if cancel.load(Ordering::Relaxed) {
             bail!("cancelled");
         }
-        Ok(self.state.as_iter().map(|segment| segment.to_str_lossy().map(|s| s.into_owned()).unwrap_or_default()).collect::<Vec<_>>().join(" "))
+        Ok(self
+            .state
+            .as_iter()
+            .map(|segment| segment.to_str_lossy().map(|s| s.into_owned()).unwrap_or_default())
+            .collect::<Vec<_>>()
+            .join(" "))
     }
 }
 
-/// `set_abort_callback_safe` cannot infer the closure type from its `Into<Option<F>>` bound.
-fn set_abort<F: FnMut() -> bool + 'static>(params: &mut FullParams, callback: F) {
-    params.set_abort_callback_safe::<Option<F>, F>(Some(callback));
+/// whisper-rs's trampoline reinterprets the stored pointer as the callback type `F`, but stores a boxed trait
+/// object, so `F` must be exactly `Box<dyn FnMut() -> bool>` or the callback reads garbage.
+fn set_abort(params: &mut FullParams, callback: impl FnMut() -> bool + 'static) {
+    type Callback = Box<dyn FnMut() -> bool>;
+    params.set_abort_callback_safe::<Option<Callback>, Callback>(Some(Box::new(callback)));
 }

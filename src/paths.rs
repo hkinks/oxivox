@@ -21,7 +21,11 @@ pub fn data_dir() -> PathBuf {
     xdg("XDG_DATA_HOME", ".local/share")
 }
 
+/// `$RUSTLE_SOCKET` overrides the default, e.g. to run a second daemon for testing.
 pub fn socket_path() -> PathBuf {
+    if let Some(path) = std::env::var_os("RUSTLE_SOCKET") {
+        return PathBuf::from(path);
+    }
     let runtime = std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
     runtime.join("rustle.sock")
 }
@@ -30,8 +34,5 @@ pub fn socket_path() -> PathBuf {
 pub fn model_candidates() -> Vec<PathBuf> {
     const FILE: &str = "ggml-large-v3-turbo.bin";
     let data = data_dir();
-    vec![
-        data.join("rustle/models").join(FILE),
-        data.join("voxtype/models").join(FILE),
-    ]
+    vec![data.join("rustle/models").join(FILE), data.join("voxtype/models").join(FILE)]
 }

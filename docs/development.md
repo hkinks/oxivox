@@ -25,6 +25,10 @@ rustle status
 `contrib/` has a Hyprland bind snippet (including the Escape submap), a systemd user unit and example
 `config.toml` / `theme.toml`.
 
+Overlay on Hyprland (`rustle overlay-demo`): warming up, recording, transcribing, error flash.
+
+![overlay states](overlay-states.png)
+
 ## Layout
 
 | path | role |

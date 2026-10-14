@@ -18,7 +18,8 @@ pub struct Hyprland {
 impl Hyprland {
     /// Needs `HYPRLAND_INSTANCE_SIGNATURE` and `XDG_RUNTIME_DIR` in the environment.
     pub fn from_env() -> Result<Self> {
-        let signature = std::env::var("HYPRLAND_INSTANCE_SIGNATURE").context("HYPRLAND_INSTANCE_SIGNATURE is not set")?;
+        let signature =
+            std::env::var("HYPRLAND_INSTANCE_SIGNATURE").context("HYPRLAND_INSTANCE_SIGNATURE is not set")?;
         let runtime = std::env::var("XDG_RUNTIME_DIR").context("XDG_RUNTIME_DIR is not set")?;
         let socket = PathBuf::from(runtime).join("hypr").join(signature).join(".socket.sock");
         if !socket.exists() {
@@ -44,12 +45,14 @@ impl Hyprland {
         Ok(())
     }
 
-    fn window_exists(&self, window: &Window) -> bool {
-        self.request("j/clients")
-            .ok()
-            .and_then(|json| serde_json::from_str::<serde_json::Value>(&json).ok())
-            .and_then(|clients| clients.as_array().map(|all| all.iter().any(|c| c["address"] == window.id.as_str())))
-            .unwrap_or(false)
+    /// The window with this address, if it still exists.
+    pub fn find_window(&self, address: &str) -> Option<Window> {
+        let clients: serde_json::Value = serde_json::from_str(&self.request("j/clients").ok()?).ok()?;
+        clients
+            .as_array()?
+            .iter()
+            .find(|c| c["address"] == address)
+            .map(|c| Window { id: address.to_string(), class: c["class"].as_str().unwrap_or_default().to_string() })
     }
 }
 
@@ -112,7 +115,8 @@ fn wl_copy(mime: Option<&str>, data: &[u8]) -> Result<()> {
     if let Some(mime) = mime {
         command.args(["--type", mime]);
     }
-    let mut child = command.stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().context("running wl-copy")?;
+    let mut child =
+        command.stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().context("running wl-copy")?;
     child.stdin.take().context("wl-copy stdin")?.write_all(data)?;
     if !child.wait()?.success() {
         bail!("wl-copy failed");
@@ -137,7 +141,7 @@ impl Output for HyprlandOutput {
         wl_copy(Some("text/plain;charset=utf-8"), text.as_bytes())?;
 
         let current = self.hypr.active().ok().flatten();
-        let target = target.filter(|w| self.hypr.window_exists(w)).cloned().or(current.clone());
+        let target = target.filter(|w| self.hypr.find_window(&w.id).is_some()).cloned().or(current.clone());
         let Some(target) = target else { bail!("no window to paste into") };
         if current.as_ref().map(|w| &w.id) != Some(&target.id) {
             self.hypr.dispatch(&format!("focuswindow address:{}", target.id))?;

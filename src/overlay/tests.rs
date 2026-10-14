@@ -54,7 +54,7 @@ fn body_is_rounded_and_themed() {
     o.apply(OverlayCmd::Show(View::WarmingUp), now);
     let pm = snapshot("warming-up", &o, now, 1);
     assert_eq!(pixel(&pm, 0, 0)[3], 0, "corner is outside the rounded shape");
-    assert_eq!(pixel(&pm, 180, 0)[3] > 200, true, "top border is drawn");
+    assert!(pixel(&pm, 180, 0)[3] > 200, "top border is drawn");
     let theme = Theme::default();
     assert!(distance(pixel(&pm, 180, 52), theme.background) < 12, "body shows the background colour");
 }
@@ -101,7 +101,8 @@ fn transcribing_dims_the_frozen_spectrogram() {
     let theme = Theme::default();
     let probe = (200, 36);
     assert!(
-        distance(pixel(&transcribing, probe.0, probe.1), theme.surface) < distance(pixel(&recording, probe.0, probe.1), theme.surface)
+        distance(pixel(&transcribing, probe.0, probe.1), theme.surface)
+            < distance(pixel(&recording, probe.0, probe.1), theme.surface)
     );
 }
 
@@ -109,10 +110,7 @@ fn transcribing_dims_the_frozen_spectrogram() {
 fn error_flash_has_error_border_and_expires() {
     let mut o = overlay_with_font();
     let now = Instant::now();
-    o.apply(
-        OverlayCmd::Show(View::Flash(FlashMessage { text: "no microphone".into(), kind: FlashKind::Error })),
-        now,
-    );
+    o.apply(OverlayCmd::Show(View::Flash(FlashMessage { text: "no microphone".into(), kind: FlashKind::Error })), now);
     let pm = snapshot("error-flash", &o, now, 1);
     let theme = Theme::default();
     assert!(distance(pixel(&pm, 180, 0), theme.error) < 40, "border turns to the error colour");
@@ -132,10 +130,7 @@ fn error_flash_has_error_border_and_expires() {
 fn info_flash_is_not_error_coloured() {
     let mut o = overlay_with_font();
     let now = Instant::now();
-    o.apply(
-        OverlayCmd::Show(View::Flash(FlashMessage { text: "nothing heard".into(), kind: FlashKind::Info })),
-        now,
-    );
+    o.apply(OverlayCmd::Show(View::Flash(FlashMessage { text: "nothing heard".into(), kind: FlashKind::Info })), now);
     let pm = snapshot("nothing-heard", &o, now, 1);
     assert!(distance(pixel(&pm, 180, 0), Theme::default().error) > 100);
 }

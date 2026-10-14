@@ -43,6 +43,9 @@ fn serve_connection(stream: UnixStream, on_request: &(dyn Fn(Request) + Send)) -
     let mut line = String::new();
     BufReader::new(&stream).read_line(&mut line)?;
     let mut stream = stream;
+    if line.is_empty() {
+        return Ok(()); // probe: the peer connected and left again
+    }
     let Some(command) = Command::parse(&line) else {
         writeln!(stream, "error: unknown command {:?}", line.trim())?;
         return Ok(());
@@ -66,5 +69,48 @@ impl Trigger for SocketTrigger {
             }
         })?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ipc;
+
+    fn socket_path(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("rustle-test-{}-{name}.sock", std::process::id()))
+    }
+
+    #[test]
+    fn commands_reach_the_handler_and_replies_come_back() {
+        let path = socket_path("roundtrip");
+        let (trigger, _guard) = SocketTrigger::bind(path.clone()).unwrap();
+        Box::new(trigger)
+            .spawn(Box::new(|request| {
+                let _ = request.reply.send(format!("got {}", request.command.name()));
+            }))
+            .unwrap();
+        assert_eq!(ipc::send(&path, Command::Toggle).unwrap(), "got toggle");
+        assert_eq!(ipc::send(&path, Command::Status).unwrap(), "got status");
+    }
+
+    #[test]
+    fn a_second_daemon_is_refused_and_a_stale_socket_is_replaced() {
+        let path = socket_path("exclusive");
+        let (trigger, guard) = SocketTrigger::bind(path.clone()).unwrap();
+        Box::new(trigger).spawn(Box::new(|_| {})).unwrap();
+        assert!(SocketTrigger::bind(path.clone()).is_err());
+
+        // A socket file nobody listens on is left over from a crashed daemon.
+        let stale = socket_path("stale");
+        drop(UnixListener::bind(&stale).unwrap());
+        assert!(SocketTrigger::bind(stale).is_ok());
+        drop(guard);
+    }
+
+    #[test]
+    fn the_client_explains_a_missing_daemon() {
+        let message = format!("{:#}", ipc::send(&socket_path("missing"), Command::Toggle).unwrap_err());
+        assert!(message.contains("rustle daemon"), "{message}");
     }
 }

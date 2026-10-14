@@ -45,7 +45,7 @@ fn paint(c: Color) -> Paint<'static> {
 
 fn rounded_rect(x: f32, y: f32, w: f32, h: f32, r: f32) -> Option<Path> {
     let r = r.min(w / 2.0).min(h / 2.0);
-    let k = r * 0.552_284_75;
+    let k = r * 0.552_284_8;
     let mut pb = PathBuilder::new();
     pb.move_to(x + r, y);
     pb.line_to(x + w - r, y);
@@ -99,7 +99,8 @@ pub fn render(pixmap: &mut Pixmap, scene: &Scene) {
         pixmap.stroke_path(&body, &paint(border), &stroke, tf, None);
     }
 
-    let region = (REGION_LEFT, REGION_VERTICAL_MARGIN, w - REGION_LEFT - REGION_RIGHT_MARGIN, h - 2.0 * REGION_VERTICAL_MARGIN);
+    let region =
+        (REGION_LEFT, REGION_VERTICAL_MARGIN, w - REGION_LEFT - REGION_RIGHT_MARGIN, h - 2.0 * REGION_VERTICAL_MARGIN);
     draw_dot(pixmap, scene, tf, h / 2.0);
     match scene.view {
         View::Hidden => {}
@@ -126,14 +127,16 @@ fn draw_dot(pixmap: &mut Pixmap, scene: &Scene, tf: Transform, cy: f32) {
         View::Hidden => return,
         View::WarmingUp => (theme.text.with_alpha(0.3 + 0.3 * pulse), None),
         View::Recording => (theme.accent, Some((theme.accent.with_alpha(0.28 * (1.0 - pulse)), 5.0 + 4.0 * pulse))),
-        View::Transcribing => (theme.accent.mix(theme.text, 0.5), Some((theme.accent.with_alpha(0.2 * pulse), 5.0 + 3.0 * pulse))),
+        View::Transcribing => {
+            (theme.accent.mix(theme.text, 0.5), Some((theme.accent.with_alpha(0.2 * pulse), 5.0 + 3.0 * pulse)))
+        }
         View::Flash(f) if f.kind == FlashKind::Error => (theme.error, None),
         View::Flash(_) => (theme.text.with_alpha(0.5), None),
     };
-    if let Some((halo_colour, radius)) = halo {
-        if let Some(path) = PathBuilder::from_circle(DOT_X, cy, radius) {
-            pixmap.fill_path(&path, &paint(halo_colour), FillRule::Winding, tf, None);
-        }
+    if let Some((halo_colour, radius)) = halo
+        && let Some(path) = PathBuilder::from_circle(DOT_X, cy, radius)
+    {
+        pixmap.fill_path(&path, &paint(halo_colour), FillRule::Winding, tf, None);
     }
     if let Some(path) = PathBuilder::from_circle(DOT_X, cy, 5.0) {
         pixmap.fill_path(&path, &paint(colour), FillRule::Winding, tf, None);

@@ -29,6 +29,16 @@ pub trait Output: Send + Sync {
     fn deliver(&self, text: &str, target: Option<&Window>) -> Result<()>;
 }
 
+/// Logs the text instead of pasting it, to try a daemon without touching any window.
+pub struct LogOutput;
+
+impl Output for LogOutput {
+    fn deliver(&self, text: &str, target: Option<&Window>) -> Result<()> {
+        tracing::info!(?target, %text, "dry run: would paste");
+        Ok(())
+    }
+}
+
 /// Receives commands from a hotkey, the CLI, a desktop portal...
 pub trait Trigger {
     fn spawn(self: Box<Self>, on_request: Box<dyn Fn(Request) + Send>) -> Result<()>;
@@ -44,6 +54,7 @@ pub enum CaptureEvent {
 }
 
 pub trait Capture {
+    /// Opens the microphone and streams its samples to `sink` until [`Capture::stop`].
     fn start(&mut self, sink: Box<dyn FnMut(CaptureEvent) + Send>) -> Result<()>;
     /// Closes the stream and waits until it is closed, so a headset can return to its music profile.
     fn stop(&mut self);

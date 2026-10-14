@@ -25,10 +25,8 @@ pub fn has_speech(samples: &[f32]) -> bool {
 
 /// Mono f32 at 16 kHz from interleaved samples. Downsampling averages the covered input span.
 pub fn to_mono_16k(interleaved: &[f32], channels: usize, rate: u32) -> Vec<f32> {
-    let mono: Vec<f32> = interleaved
-        .chunks_exact(channels.max(1))
-        .map(|frame| frame.iter().sum::<f32>() / frame.len() as f32)
-        .collect();
+    let mono: Vec<f32> =
+        interleaved.chunks_exact(channels.max(1)).map(|frame| frame.iter().sum::<f32>() / frame.len() as f32).collect();
     if rate as usize == SAMPLE_RATE || mono.is_empty() {
         return mono;
     }

@@ -11,8 +11,9 @@ use std::thread::JoinHandle;
 use super::{Capture, CaptureEvent};
 use crate::state::MicFailure;
 
-#[derive(Default)]
 pub struct PipewireCapture {
+    /// Node to record from; the default source when `None`.
+    source: Option<String>,
     stop: Option<pw::channel::Sender<()>>,
     thread: Option<JoinHandle<()>>,
 }
@@ -20,15 +21,22 @@ pub struct PipewireCapture {
 type Sink = Box<dyn FnMut(CaptureEvent) + Send>;
 type SharedSink = Rc<RefCell<Sink>>;
 
+impl PipewireCapture {
+    pub fn new(source: Option<String>) -> Self {
+        Self { source, stop: None, thread: None }
+    }
+}
+
 impl Capture for PipewireCapture {
     fn start(&mut self, sink: Sink) -> Result<()> {
         self.stop();
         let (stop_tx, stop_rx) = pw::channel::channel::<()>();
+        let source = self.source.clone();
         let thread = std::thread::Builder::new()
             .name("pipewire-capture".into())
             .spawn(move || {
                 let sink = Rc::new(RefCell::new(sink));
-                if let Err(e) = run(sink.clone(), stop_rx) {
+                if let Err(e) = run(sink.clone(), source, stop_rx) {
                     tracing::error!("pipewire capture failed: {e}");
                     (sink.borrow_mut())(CaptureEvent::Failed(MicFailure::NoMicrophone));
                 }
@@ -55,18 +63,21 @@ impl Drop for PipewireCapture {
     }
 }
 
-fn run(sink: SharedSink, stop: pw::channel::Receiver<()>) -> Result<(), pw::Error> {
+fn run(sink: SharedSink, source: Option<String>, stop: pw::channel::Receiver<()>) -> Result<(), pw::Error> {
     pw::init();
     let mainloop = pw::main_loop::MainLoopRc::new(None)?;
     let context = pw::context::ContextRc::new(&mainloop, None)?;
     let core = context.connect_rc(None)?;
 
-    let props = properties! {
+    let mut props = properties! {
         *pw::keys::MEDIA_TYPE => "Audio",
         *pw::keys::MEDIA_CATEGORY => "Capture",
         *pw::keys::MEDIA_ROLE => "Communication",
         *pw::keys::APP_NAME => "rustle",
     };
+    if let Some(source) = source {
+        props.insert(*pw::keys::TARGET_OBJECT, source);
+    }
     let stream = pw::stream::StreamBox::new(&core, "rustle", props)?;
 
     // Both callbacks run on this thread's loop.
@@ -117,7 +128,9 @@ fn run(sink: SharedSink, stop: pw::channel::Receiver<()>) -> Result<(), pw::Erro
     stream.connect(
         spa::utils::Direction::Input,
         None,
-        pw::stream::StreamFlags::AUTOCONNECT | pw::stream::StreamFlags::MAP_BUFFERS | pw::stream::StreamFlags::RT_PROCESS,
+        pw::stream::StreamFlags::AUTOCONNECT
+            | pw::stream::StreamFlags::MAP_BUFFERS
+            | pw::stream::StreamFlags::RT_PROCESS,
         &mut params,
     )?;
 
