@@ -917,6 +917,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustle-dictation"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "fontdue",
+ "hound",
+ "notify",
+ "pipewire",
+ "rustfft",
+ "serde",
+ "serde_json",
+ "smithay-client-toolkit",
+ "tiny-skia",
+ "toml 0.9.12+spec-1.1.0",
+ "tracing",
+ "tracing-subscriber",
+ "whisper-rs",
+]
+
+[[package]]
 name = "same-file"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1598,27 +1619,6 @@ name = "winnow"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
-
-[[package]]
-name = "wisprs"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "fontdue",
- "hound",
- "notify",
- "pipewire",
- "rustfft",
- "serde",
- "serde_json",
- "smithay-client-toolkit",
- "tiny-skia",
- "toml 0.9.12+spec-1.1.0",
- "tracing",
- "tracing-subscriber",
- "whisper-rs",
-]
 
 [[package]]
 name = "xcursor"

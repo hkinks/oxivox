@@ -1,6 +1,7 @@
 mod audio;
 mod config;
 mod daemon;
+mod demo;
 mod engine;
 mod ipc;
 mod overlay;
@@ -45,6 +46,12 @@ enum Action {
     Cancel,
     /// Print the daemon's state
     Status,
+    /// Show the overlay with synthetic audio, without microphone or model
+    #[command(hide = true)]
+    OverlayDemo {
+        #[arg(long, default_value_t = 6.0)]
+        seconds: f32,
+    },
     /// Transcribe a WAV file and print the text
     Transcribe {
         file: PathBuf,
@@ -54,20 +61,24 @@ enum Action {
         /// Language code, or "auto"; defaults to the configured language
         #[arg(long)]
         language: Option<String>,
+        /// Run on the CPU instead of the GPU
+        #[arg(long)]
+        cpu: bool,
     },
 }
 
 fn main() -> Result<()> {
     tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "wisprs=info".into()))
+        .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "rustle=info".into()))
         .with_writer(std::io::stderr)
         .init();
     match Cli::parse().command {
         Action::Daemon => run_daemon(),
+        Action::OverlayDemo { seconds } => demo::run(seconds),
         Action::Toggle => client(Command::Toggle),
         Action::Cancel => client(Command::Cancel),
         Action::Status => client(Command::Status),
-        Action::Transcribe { file, model, language } => transcribe(file, model, language),
+        Action::Transcribe { file, model, language, cpu } => transcribe(file, model, language, !cpu),
     }
 }
 
@@ -76,7 +87,7 @@ fn client(command: Command) -> Result<()> {
     Ok(())
 }
 
-fn transcribe(file: PathBuf, model: Option<PathBuf>, language: Option<String>) -> Result<()> {
+fn transcribe(file: PathBuf, model: Option<PathBuf>, language: Option<String>, gpu: bool) -> Result<()> {
     let config = Config::load_default()?;
     let model = match model {
         Some(model) => model,
@@ -85,7 +96,7 @@ fn transcribe(file: PathBuf, model: Option<PathBuf>, language: Option<String>) -
     let language = language.unwrap_or_else(|| config.language.clone());
     let language = (language != "auto" && !language.is_empty()).then_some(language);
     let audio = audio::read_wav(&file)?;
-    let mut engine = WhisperEngine::load(&model, language.as_deref())?;
+    let mut engine = WhisperEngine::load(&model, language.as_deref(), gpu && config.gpu)?;
     let raw = engine.transcribe(&audio, &Default::default())?;
     println!("{}", tokens::clean(&raw));
     Ok(())
@@ -96,7 +107,7 @@ fn run_daemon() -> Result<()> {
     let model = config.model_path()?;
     let (trigger, _socket_guard) = SocketTrigger::bind(paths::socket_path())?;
 
-    let engine = WhisperEngine::load(&model, config.language_code())?;
+    let engine = WhisperEngine::load(&model, config.language_code(), config.gpu)?;
     tracing::info!("model loaded");
 
     let hypr = Hyprland::from_env()?;

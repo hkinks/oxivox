@@ -93,7 +93,7 @@ pub fn render(pixmap: &mut Pixmap, scene: &Scene) {
     let erroring = matches!(scene.view, View::Flash(f) if f.kind == FlashKind::Error);
 
     if let Some(body) = rounded_rect(0.5, 0.5, w - 1.0, h - 1.0, scene.radius) {
-        pixmap.fill_path(&body, &paint(theme.background.with_alpha(0.95)), FillRule::Winding, tf, None);
+        pixmap.fill_path(&body, &paint(theme.background), FillRule::Winding, tf, None);
         let border = if erroring { theme.error } else { theme.border };
         let stroke = Stroke { width: 1.0, ..Stroke::default() };
         pixmap.stroke_path(&body, &paint(border), &stroke, tf, None);

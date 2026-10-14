@@ -1,5 +1,5 @@
 {
-  description = "wisprs: dictation for Linux with a themed overlay";
+  description = "rustle: dictation for Linux with a themed overlay";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
 
@@ -26,7 +26,7 @@
       runtimeTools = with pkgs; [ wl-clipboard playerctl fontconfig ];
     in {
       packages.${system}.default = pkgs.rustPlatform.buildRustPackage {
-        pname = "wisprs";
+        pname = "rustle-dictation";
         version = "0.1.0";
         src = self;
         cargoLock.lockFile = ./Cargo.lock;
@@ -35,12 +35,12 @@
         dontUseCmakeConfigure = true;
         doCheck = false;
         postFixup = ''
-          wrapProgram $out/bin/wisprs \
+          wrapProgram $out/bin/rustle \
             --prefix PATH : ${pkgs.lib.makeBinPath runtimeTools} \
             --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath [ pkgs.vulkan-loader pkgs.wayland pkgs.libxkbcommon ]}
         '';
         nativeBuildInputs = nativeBuildInputs ++ [ pkgs.makeWrapper ];
-        meta.mainProgram = "wisprs";
+        meta.mainProgram = "rustle";
       };
 
       devShells.${system}.default = pkgs.mkShell {

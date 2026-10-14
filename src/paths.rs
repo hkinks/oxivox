@@ -1,4 +1,4 @@
-//! XDG locations used by wisprs.
+//! XDG locations used by rustle.
 
 use std::path::PathBuf;
 
@@ -14,7 +14,7 @@ fn xdg(var: &str, fallback: &str) -> PathBuf {
 }
 
 pub fn config_dir() -> PathBuf {
-    xdg("XDG_CONFIG_HOME", ".config").join("wisprs")
+    xdg("XDG_CONFIG_HOME", ".config").join("rustle")
 }
 
 pub fn data_dir() -> PathBuf {
@@ -23,7 +23,7 @@ pub fn data_dir() -> PathBuf {
 
 pub fn socket_path() -> PathBuf {
     let runtime = std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
-    runtime.join("wisprs.sock")
+    runtime.join("rustle.sock")
 }
 
 /// Default model locations, in order of preference.
@@ -31,7 +31,7 @@ pub fn model_candidates() -> Vec<PathBuf> {
     const FILE: &str = "ggml-large-v3-turbo.bin";
     let data = data_dir();
     vec![
-        data.join("wisprs/models").join(FILE),
+        data.join("rustle/models").join(FILE),
         data.join("voxtype/models").join(FILE),
     ]
 }

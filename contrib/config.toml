@@ -1,0 +1,19 @@
+# $XDG_CONFIG_HOME/rustle/config.toml: every key is optional; these are the defaults.
+# model = "/path/to/ggml-large-v3-turbo.bin"   # default: ~/.local/share/rustle/models, then the voxtype copy
+language = "auto"
+max_length_secs = 300
+gpu = true
+# cancel_submap = "rustle"                     # see hyprland.conf
+
+[overlay]
+width = 360
+height = 56
+bottom_margin = 48
+radius = 12.0
+
+[paste]
+keys = "CTRL"
+terminal_keys = "CTRL SHIFT"
+terminal_classes = ["ghostty", "alacritty", "kitty", "foot", "konsole", "terminal", "wezterm"]
+# [paste.classes]
+# "emacs" = "ALT"

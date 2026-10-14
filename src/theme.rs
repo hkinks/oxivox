@@ -1,4 +1,4 @@
-//! Overlay palette. Read from `$XDG_CONFIG_HOME/wisprs/theme.toml`, Tokyo Night when absent.
+//! Overlay palette. Read from `$XDG_CONFIG_HOME/rustle/theme.toml`, Tokyo Night when absent.
 
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
@@ -120,6 +120,11 @@ mod tests {
         let t = Theme::parse("accent = \"#ff9e64\"").unwrap();
         assert_eq!(t.accent, Color::rgb(0xff, 0x9e, 0x64));
         assert_eq!(t.background, Theme::default().background);
+    }
+
+    #[test]
+    fn documented_example_matches_tokyo_night() {
+        assert_eq!(Theme::parse(include_str!("../contrib/theme.toml")).unwrap(), Theme::default());
     }
 
     #[test]

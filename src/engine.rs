@@ -22,13 +22,20 @@ pub struct WhisperEngine {
 }
 
 impl WhisperEngine {
-    pub fn load(model: &Path, language: Option<&str>) -> Result<Self> {
+    pub fn load(model: &Path, language: Option<&str>, gpu: bool) -> Result<Self> {
         let devices = whisper_rs::vulkan::list_devices();
-        if devices.is_empty() {
-            bail!("no Vulkan device found; wisprs needs a GPU for large-v3-turbo");
+        if gpu {
+            let Some(device) = devices.first() else {
+                bail!("no Vulkan device found; set `gpu = false` in the config to run on the CPU");
+            };
+            tracing::info!(gpu = %device.name, vram_free_mb = device.vram.free >> 20, "loading {}", model.display());
+        } else {
+            tracing::info!("loading {} for the CPU", model.display());
         }
-        tracing::info!(gpu = %devices[0].name, vram_mb = devices[0].vram.total >> 20, "loading {}", model.display());
-        let ctx = WhisperContext::new_with_params(model, WhisperContextParameters::default())
+        let mut params = WhisperContextParameters::default();
+        params.use_gpu(gpu);
+        params.flash_attn(gpu);
+        let ctx = WhisperContext::new_with_params(model, params)
             .map_err(|e| anyhow::anyhow!("{e:?}"))
             .with_context(|| format!("loading model {}", model.display()))?;
         let state = ctx.create_state().map_err(|e| anyhow::anyhow!("{e:?}")).context("creating whisper state")?;

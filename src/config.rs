@@ -1,4 +1,4 @@
-//! `$XDG_CONFIG_HOME/wisprs/config.toml`. Every key is optional.
+//! `$XDG_CONFIG_HOME/rustle/config.toml`. Every key is optional.
 
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
@@ -14,9 +14,11 @@ pub struct Config {
     /// ISO code such as "en", or "auto" to let the model detect it.
     pub language: String,
     pub max_length_secs: u64,
+    /// Run the model on the GPU (Vulkan). CPU is far slower and meant for machines without a usable GPU.
+    pub gpu: bool,
     pub overlay: OverlayConfig,
     pub paste: PasteConfig,
-    /// Hyprland submap that binds Escape to `wisprs cancel`; entered while recording or transcribing.
+    /// Hyprland submap that binds Escape to `rustle cancel`; entered while recording or transcribing.
     pub cancel_submap: Option<String>,
 }
 
@@ -47,6 +49,7 @@ impl Default for Config {
             model: None,
             language: "auto".into(),
             max_length_secs: 300,
+            gpu: true,
             overlay: OverlayConfig::default(),
             paste: PasteConfig::default(),
             cancel_submap: None,
@@ -170,7 +173,12 @@ mod tests {
     }
 
     #[test]
+    fn documented_example_matches_the_defaults() {
+        assert_eq!(Config::parse(include_str!("../contrib/config.toml")).unwrap(), Config::default());
+    }
+
+    #[test]
     fn missing_file_is_default() {
-        assert_eq!(Config::load(Path::new("/nonexistent/wisprs.toml")).unwrap(), Config::default());
+        assert_eq!(Config::load(Path::new("/nonexistent/rustle.toml")).unwrap(), Config::default());
     }
 }

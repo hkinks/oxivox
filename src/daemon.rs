@@ -288,3 +288,6 @@ impl Daemon {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;

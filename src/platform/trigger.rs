@@ -1,4 +1,4 @@
-//! Trigger for compositors without a global-shortcut API: the user binds a key to `wisprs toggle`,
+//! Trigger for compositors without a global-shortcut API: the user binds a key to `rustle toggle`,
 //! which reaches the daemon over a Unix socket.
 
 use anyhow::{Context, Result, bail};
@@ -29,7 +29,7 @@ impl SocketTrigger {
     pub fn bind(path: PathBuf) -> Result<(Self, SocketGuard)> {
         if path.exists() {
             if UnixStream::connect(&path).is_ok() {
-                bail!("another wisprs daemon is already listening on {}", path.display());
+                bail!("another rustle daemon is already listening on {}", path.display());
             }
             std::fs::remove_file(&path).context("removing stale socket")?;
         }

@@ -1,9 +1,13 @@
 [package]
-name = "wisprs"
+name = "rustle-dictation"
 version = "0.1.0"
 edition = "2024"
 description = "Dictation for Linux: hotkey, themed overlay with live spectrogram, local whisper transcription"
-license = "MIT"
+license = "MIT OR Apache-2.0"
+
+[[bin]]
+name = "rustle"
+path = "src/main.rs"
 
 [dependencies]
 anyhow = "1"

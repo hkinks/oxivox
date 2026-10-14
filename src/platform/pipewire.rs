@@ -65,9 +65,9 @@ fn run(sink: SharedSink, stop: pw::channel::Receiver<()>) -> Result<(), pw::Erro
         *pw::keys::MEDIA_TYPE => "Audio",
         *pw::keys::MEDIA_CATEGORY => "Capture",
         *pw::keys::MEDIA_ROLE => "Communication",
-        *pw::keys::APP_NAME => "wisprs",
+        *pw::keys::APP_NAME => "rustle",
     };
-    let stream = pw::stream::StreamBox::new(&core, "wisprs", props)?;
+    let stream = pw::stream::StreamBox::new(&core, "rustle", props)?;
 
     // Both callbacks run on this thread's loop.
     let on_state = sink.clone();

@@ -132,7 +132,7 @@ impl App {
     fn create_layer(&mut self) {
         let surface = self.compositor.create_surface(&self.qh);
         let (width, height) = self.overlay.size();
-        let layer = self.layer_shell.create_layer_surface(&self.qh, surface, Layer::Overlay, Some("wisprs"), None);
+        let layer = self.layer_shell.create_layer_surface(&self.qh, surface, Layer::Overlay, Some("rustle"), None);
         layer.set_anchor(Anchor::BOTTOM);
         layer.set_margin(0, 0, self.overlay.config().bottom_margin, 0);
         layer.set_size(width, height);
