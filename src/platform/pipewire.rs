@@ -109,7 +109,7 @@ fn run(sink: SharedSink, source: Option<String>, stop: pw::channel::Receiver<()>
 
     let mut audio_info = spa::param::audio::AudioInfoRaw::new();
     audio_info.set_format(spa::param::audio::AudioFormat::F32LE);
-    audio_info.set_rate(crate::spectrogram::SAMPLE_RATE as u32);
+    audio_info.set_rate(crate::audio::SAMPLE_RATE as u32);
     audio_info.set_channels(1);
     let object = spa::pod::Object {
         type_: spa::utils::SpaTypes::ObjectParamFormat.as_raw(),

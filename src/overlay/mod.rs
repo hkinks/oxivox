@@ -1,17 +1,18 @@
 //! The overlay model: what is shown and when. Portable; platform surfaces only present its pixels.
 
+pub mod dots;
 pub mod draw;
 pub mod text;
 
 use anyhow::Result;
 use fontdue::Font;
-use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tiny_skia::Pixmap;
 
 use crate::config::OverlayConfig;
 use crate::theme::Theme;
+use dots::Dots;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FlashKind {
@@ -37,8 +38,8 @@ pub enum View {
 #[derive(Debug, Clone)]
 pub enum OverlayCmd {
     Show(View),
-    /// New spectrogram columns, oldest first.
-    Columns(Vec<Vec<f32>>),
+    /// RMS levels of new 16 ms audio frames, oldest first.
+    Levels(Vec<f32>),
     Theme(Theme),
 }
 
@@ -48,7 +49,7 @@ pub struct Overlay {
     config: OverlayConfig,
     theme: Theme,
     view: View,
-    columns: VecDeque<Vec<f32>>,
+    dots: Dots,
     shown_at: Instant,
     flash_until: Option<Instant>,
     font: Option<Font>,
@@ -60,7 +61,7 @@ impl Overlay {
             config,
             theme,
             view: View::Hidden,
-            columns: VecDeque::new(),
+            dots: Dots::default(),
             shown_at: Instant::now(),
             flash_until: None,
             font,
@@ -84,23 +85,19 @@ impl Overlay {
             OverlayCmd::Show(view) => {
                 if !self.is_visible() || view == View::WarmingUp {
                     self.shown_at = now;
-                    self.columns.clear();
+                    self.dots.reset();
                 }
                 self.flash_until = matches!(view, View::Flash(_)).then(|| now + FLASH_DURATION);
                 self.view = view;
             }
-            OverlayCmd::Columns(columns) => {
-                self.columns.extend(columns);
-                while self.columns.len() > draw::VISIBLE_COLUMNS {
-                    self.columns.pop_front();
-                }
-            }
+            OverlayCmd::Levels(levels) => self.dots.push(&levels),
             OverlayCmd::Theme(theme) => self.theme = theme,
         }
     }
 
-    /// Hides a flash once its time is up.
+    /// Advances animations and hides a flash once its time is up.
     pub fn tick(&mut self, now: Instant) {
+        self.dots.animate(now);
         if self.flash_until.is_some_and(|until| now >= until) {
             self.flash_until = None;
             self.view = View::Hidden;
@@ -113,7 +110,7 @@ impl Overlay {
             radius: self.config.radius,
             theme: &self.theme,
             view: &self.view,
-            columns: &self.columns,
+            dots: self.dots.sizes(),
             time: now.saturating_duration_since(self.shown_at).as_secs_f32(),
             font: self.font.as_ref(),
         };

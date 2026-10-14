@@ -7,7 +7,6 @@ mod ipc;
 mod overlay;
 mod paths;
 mod platform;
-mod spectrogram;
 mod state;
 mod theme;
 mod theme_watch;
@@ -64,6 +63,20 @@ enum Action {
         #[arg(long)]
         window: Option<String>,
     },
+    /// Time the engine on a WAV file, repeatedly, with pauses in between
+    #[command(hide = true)]
+    Bench {
+        file: PathBuf,
+        #[arg(long, default_value_t = 3)]
+        runs: u32,
+        /// Seconds of idle time before every run
+        #[arg(long, default_value_t = 0)]
+        pause: u64,
+        #[arg(long)]
+        language: Option<String>,
+        #[arg(long, default_value_t = 5)]
+        beam: i32,
+    },
     /// Transcribe a WAV file and print the text
     Transcribe {
         file: PathBuf,
@@ -88,6 +101,7 @@ fn main() -> Result<()> {
         Action::Daemon { dry_run } => run_daemon(dry_run),
         Action::PasteTest { text, window } => paste_test(&text, window.as_deref()),
         Action::OverlayDemo { seconds } => demo::run(seconds),
+        Action::Bench { file, runs, pause, language, beam } => bench(&file, runs, pause, language, beam),
         Action::Toggle => client(Command::Toggle),
         Action::Cancel => client(Command::Cancel),
         Action::Status => client(Command::Status),
@@ -171,5 +185,23 @@ fn run_daemon(dry_run: bool) -> Result<()> {
         .context("starting the trigger")?;
     tracing::info!("ready on {}", paths::socket_path().display());
     daemon.run(messages);
+    Ok(())
+}
+
+fn bench(file: &std::path::Path, runs: u32, pause: u64, language: Option<String>, beam: i32) -> Result<()> {
+    let config = Config::load_default()?;
+    let audio = audio::read_wav(file)?;
+    let language = language.filter(|l| l != "auto");
+    let started = std::time::Instant::now();
+    let mut engine = WhisperEngine::load(&config.model_path()?, language.as_deref(), true)?;
+    engine.beam = beam;
+    eprintln!("load: {:.2}s, audio {:.1}s", started.elapsed().as_secs_f32(), audio.len() as f32 / 16000.0);
+    for run in 1..=runs {
+        std::thread::sleep(std::time::Duration::from_secs(pause));
+        let started = std::time::Instant::now();
+        let text = engine.transcribe(&audio, &Default::default())?;
+        eprintln!("run {run}: {:.2}s ({} chars)", started.elapsed().as_secs_f32(), text.len());
+    }
+    engine.print_timings();
     Ok(())
 }

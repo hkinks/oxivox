@@ -2,7 +2,6 @@
 //! `target/overlay-snapshots/` for looking at.
 
 use super::*;
-use crate::spectrogram::BANDS;
 use crate::theme::Color;
 
 fn overlay_with_font() -> Overlay {
@@ -24,22 +23,27 @@ fn pixel(pixmap: &Pixmap, x: u32, y: u32) -> [u8; 4] {
     [p.red(), p.green(), p.blue(), p.alpha()]
 }
 
-/// Column of mid-level energy in the lower bands, like a voice.
-fn voice_columns(count: usize) -> Vec<Vec<f32>> {
-    (0..count)
-        .map(|i| {
-            (0..BANDS)
-                .map(|b| {
-                    let envelope = 0.5 + 0.5 * (i as f32 / 9.0).sin();
-                    (envelope * (1.0 - b as f32 / BANDS as f32) * 1.1).clamp(0.0, 1.0)
-                })
-                .collect()
-        })
-        .collect()
-}
-
 fn distance(a: [u8; 4], b: Color) -> i32 {
     (a[0] as i32 - b.r as i32).abs() + (a[1] as i32 - b.g as i32).abs() + (a[2] as i32 - b.b as i32).abs()
+}
+
+/// Feeds speech-like levels (about -28 dBFS RMS with pauses) and lets the animation settle.
+fn speak(overlay: &mut Overlay, mut now: Instant, steps: usize) -> Instant {
+    for i in 0..steps {
+        let level = if i % 7 < 5 { 0.04 * (1.0 + (i % 3) as f32 * 0.4) } else { 0.002 };
+        overlay.apply(OverlayCmd::Levels(vec![level; 4]), now);
+        for _ in 0..4 {
+            now += Duration::from_millis(16);
+            overlay.tick(now);
+        }
+    }
+    now
+}
+
+const CENTRE: (u32, u32) = (180, 28);
+
+fn dot_x(index_from_centre: i32) -> u32 {
+    (180 + index_from_centre * 17) as u32
 }
 
 #[test]
@@ -55,55 +59,93 @@ fn body_is_rounded_and_themed() {
     let pm = snapshot("warming-up", &o, now, 1);
     assert_eq!(pixel(&pm, 0, 0)[3], 0, "corner is outside the rounded shape");
     assert!(pixel(&pm, 180, 0)[3] > 200, "top border is drawn");
-    let theme = Theme::default();
-    assert!(distance(pixel(&pm, 180, 52), theme.background) < 12, "body shows the background colour");
+    assert!(distance(pixel(&pm, 20, 28), Theme::default().background) < 12, "body shows the background colour");
 }
 
 #[test]
-fn recording_draws_accent_where_there_is_energy() {
+fn warming_up_is_a_static_row_of_small_dim_dots() {
     let mut o = overlay_with_font();
     let now = Instant::now();
     o.apply(OverlayCmd::Show(View::WarmingUp), now);
-    let quiet = snapshot("recording-quiet", &o, now, 1);
-    o.apply(OverlayCmd::Show(View::Recording), now);
-    o.apply(OverlayCmd::Columns(voice_columns(200)), now);
-    let loud = snapshot("recording", &o, now, 1);
+    let first = snapshot("warming-up", &o, now, 1);
+    o.tick(now + Duration::from_millis(700));
+    let later = snapshot("warming-up-later", &o, now + Duration::from_millis(700), 1);
+    assert_eq!(first.data(), later.data(), "nothing moves while warming up");
     let theme = Theme::default();
-    // Low-frequency rows at the right edge of the spectrogram are bright; the same place is plain background when warming up.
-    let probe = (300, 36);
-    assert!(distance(pixel(&loud, probe.0, probe.1), theme.surface) > 80);
-    assert!(distance(pixel(&quiet, probe.0, probe.1), theme.background) < 12);
-    // The state dot is accent coloured while recording.
-    assert!(distance(pixel(&loud, 22, 28), theme.accent) < 12);
+    // Dots exist at the expected places, between them it is background.
+    assert!(distance(pixel(&first, dot_x(0), 28), theme.background) > 40);
+    assert!(distance(pixel(&first, dot_x(0) + 8, 28), theme.background) < 12);
+    // ...and they are small: nothing above or below the centre line.
+    assert!(distance(pixel(&first, dot_x(0), 20), theme.background) < 12);
 }
 
 #[test]
-fn newest_column_is_on_the_right() {
+fn speech_makes_the_dots_react_with_the_accent_colour() {
     let mut o = overlay_with_font();
     let now = Instant::now();
     o.apply(OverlayCmd::Show(View::Recording), now);
-    o.apply(OverlayCmd::Columns(voice_columns(5)), now);
-    let pm = snapshot("recording-start", &o, now, 1);
+    let silent = snapshot("recording-silent", &o, now, 1);
+    let end = speak(&mut o, now, 60);
+    let loud = snapshot("recording", &o, end, 1);
     let theme = Theme::default();
-    assert!(distance(pixel(&pm, 60, 36), theme.surface) < 12, "left side is still empty");
-    assert!(distance(pixel(&pm, 340, 36), theme.surface) > 40, "right side has the new columns");
-}
-
-#[test]
-fn transcribing_dims_the_frozen_spectrogram() {
-    let mut o = overlay_with_font();
-    let now = Instant::now();
-    o.apply(OverlayCmd::Show(View::Recording), now);
-    o.apply(OverlayCmd::Columns(voice_columns(200)), now);
-    let recording = snapshot("recording-before-stop", &o, now, 1);
-    o.apply(OverlayCmd::Show(View::Transcribing), now);
-    let transcribing = snapshot("transcribing", &o, now, 1);
-    let theme = Theme::default();
-    let probe = (200, 36);
+    // Some dot has grown tall: pixels well above the centre line are now accent-ish.
+    let tall = (0..19).any(|i| {
+        let x = dot_x(i - 9);
+        (0..8).any(|dy| {
+            distance(pixel(&loud, x, 28 - 8 - dy), theme.accent) < 120
+                && distance(pixel(&loud, x, 28 - 8 - dy), theme.background) > 80
+        })
+    });
+    assert!(tall, "no dot grew with speech");
     assert!(
-        distance(pixel(&transcribing, probe.0, probe.1), theme.surface)
-            < distance(pixel(&recording, probe.0, probe.1), theme.surface)
+        silent.data().iter().zip(loud.data()).filter(|(a, b)| a != b).count() > 500,
+        "the picture changed substantially"
     );
+}
+
+#[test]
+fn recording_row_is_symmetric_about_the_centre() {
+    let mut o = overlay_with_font();
+    let now = Instant::now();
+    o.apply(OverlayCmd::Show(View::Recording), now);
+    let end = speak(&mut o, now, 40);
+    let pm = snapshot("recording-symmetry", &o, end, 1);
+    for i in 1..9 {
+        let (left, right) = (pixel(&pm, dot_x(-i), 22), pixel(&pm, dot_x(i), 22));
+        assert_eq!(left, right, "dot {i} differs between the sides");
+    }
+}
+
+#[test]
+fn quiet_room_noise_stays_calm() {
+    let mut o = overlay_with_font();
+    let now = Instant::now();
+    o.apply(OverlayCmd::Show(View::Recording), now);
+    let mut t = now;
+    for _ in 0..80 {
+        o.apply(OverlayCmd::Levels(vec![0.0005; 4]), t);
+        t += Duration::from_millis(64);
+        o.tick(t);
+    }
+    let pm = snapshot("recording-noise", &o, t, 1);
+    assert!(distance(pixel(&pm, dot_x(0), 22), Theme::default().background) < 12, "dots stay at their smallest");
+}
+
+#[test]
+fn transcribing_wave_moves_and_stays_clean() {
+    let mut o = overlay_with_font();
+    let now = Instant::now();
+    o.apply(OverlayCmd::Show(View::Recording), now);
+    let end = speak(&mut o, now, 30);
+    o.apply(OverlayCmd::Show(View::Transcribing), end);
+    let a = snapshot("transcribing", &o, end, 1);
+    let b = snapshot("transcribing-later", &o, end + Duration::from_millis(400), 1);
+    assert_ne!(a.data(), b.data(), "the wave travels");
+    // The dots from speech do not linger: the wave does not depend on the voice.
+    let mut quiet = overlay_with_font();
+    quiet.apply(OverlayCmd::Show(View::Transcribing), now);
+    let c = snapshot("transcribing-fresh", &quiet, now + (end - now), 1);
+    assert_eq!(a.data(), c.data());
 }
 
 #[test]
@@ -116,9 +158,8 @@ fn error_flash_has_error_border_and_expires() {
     assert!(distance(pixel(&pm, 180, 0), theme.error) < 40, "border turns to the error colour");
     assert!(distance(pixel(&pm, 22, 28), theme.error) < 12, "dot is the error colour");
     if o.font.is_some() {
-        // Text pixels in the middle differ from the plain body.
-        let plain = (30..330).any(|x| (20..36).any(|y| distance(pixel(&pm, x, y), theme.background) > 150));
-        assert!(plain, "message text is drawn");
+        let text_drawn = (30..330).any(|x| (20..36).any(|y| distance(pixel(&pm, x, y), theme.background) > 150));
+        assert!(text_drawn, "message text is drawn");
     }
     o.tick(now + Duration::from_millis(500));
     assert!(o.is_visible());
@@ -139,11 +180,10 @@ fn info_flash_is_not_error_coloured() {
 fn scaled_buffer_has_same_layout() {
     let mut o = overlay_with_font();
     let now = Instant::now();
-    o.apply(OverlayCmd::Show(View::Recording), now);
-    o.apply(OverlayCmd::Columns(voice_columns(200)), now);
-    let pm = snapshot("recording-2x", &o, now, 2);
+    o.apply(OverlayCmd::Show(View::WarmingUp), now);
+    let pm = snapshot("warming-up-2x", &o, now, 2);
     assert_eq!((pm.width(), pm.height()), (720, 112));
-    assert!(distance(pixel(&pm, 44, 56), Theme::default().accent) < 12);
+    assert!(distance(pixel(&pm, 2 * CENTRE.0, 2 * CENTRE.1), Theme::default().background) > 40);
 }
 
 #[test]
@@ -151,16 +191,24 @@ fn theme_change_applies() {
     let mut o = overlay_with_font();
     let now = Instant::now();
     o.apply(OverlayCmd::Show(View::Recording), now);
+    let end = speak(&mut o, now, 40);
     let orange = Theme::parse("accent = \"#ff9e64\"").unwrap();
-    o.apply(OverlayCmd::Theme(orange.clone()), now);
-    let pm = snapshot("recording-orange", &o, now, 1);
-    assert!(distance(pixel(&pm, 22, 28), orange.accent) < 12);
+    o.apply(OverlayCmd::Theme(orange.clone()), end);
+    let pm = snapshot("recording-orange", &o, end, 1);
+    let blue = Theme::default().accent;
+    let tinted = (0..19).any(|i| (10..46).any(|y| distance(pixel(&pm, dot_x(i - 9), y), orange.accent) < distance(pixel(&pm, dot_x(i - 9), y), blue) - 100));
+    assert!(tinted);
 }
 
 #[test]
-fn history_is_capped() {
+fn a_new_recording_starts_with_no_history() {
     let mut o = overlay_with_font();
     let now = Instant::now();
-    o.apply(OverlayCmd::Columns(voice_columns(draw::VISIBLE_COLUMNS * 2)), now);
-    assert_eq!(o.columns.len(), draw::VISIBLE_COLUMNS);
+    o.apply(OverlayCmd::Show(View::Recording), now);
+    let end = speak(&mut o, now, 30);
+    o.apply(OverlayCmd::Show(View::Hidden), end);
+    o.apply(OverlayCmd::Show(View::WarmingUp), end);
+    o.apply(OverlayCmd::Show(View::Recording), end);
+    o.tick(end + Duration::from_millis(100));
+    assert!(o.dots.sizes().iter().all(|&s| s == 0.0));
 }

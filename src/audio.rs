@@ -3,7 +3,7 @@
 use anyhow::{Context, Result};
 use std::path::Path;
 
-use crate::spectrogram::SAMPLE_RATE;
+pub const SAMPLE_RATE: usize = 16_000;
 
 const FRAME: usize = SAMPLE_RATE / 50;
 /// RMS of a frame that counts as sound (about -46 dBFS).
@@ -49,7 +49,12 @@ pub fn to_mono_16k(interleaved: &[f32], channels: usize, rate: u32) -> Vec<f32> 
 }
 
 pub fn read_wav(path: &Path) -> Result<Vec<f32>> {
-    let mut reader = hound::WavReader::open(path).with_context(|| format!("opening {}", path.display()))?;
+    let file = std::fs::File::open(path).with_context(|| format!("opening {}", path.display()))?;
+    read_wav_from(std::io::BufReader::new(file)).with_context(|| path.display().to_string())
+}
+
+pub fn read_wav_from(source: impl std::io::Read) -> Result<Vec<f32>> {
+    let mut reader = hound::WavReader::new(source)?;
     let spec = reader.spec();
     let samples: Vec<f32> = match spec.sample_format {
         hound::SampleFormat::Float => reader.samples::<f32>().collect::<Result<_, _>>()?,
@@ -81,6 +86,16 @@ mod tests {
     }
 
     #[test]
+    fn frame_meter_reports_rms_per_frame_across_chunks() {
+        let mut meter = FrameMeter::default();
+        assert!(meter.push(&[0.5; 100]).is_empty());
+        let levels = meter.push(&[0.5; 500]);
+        assert_eq!(levels.len(), 2);
+        assert!(levels.iter().all(|l| (l - 0.5).abs() < 1e-6));
+        assert_eq!(meter.push(&[0.0; 168]).len(), 1);
+    }
+
+    #[test]
     fn downmix_and_resample() {
         let stereo: Vec<f32> = (0..48_000).flat_map(|_| [1.0, 0.0]).collect();
         let out = to_mono_16k(&stereo, 2, 48_000);
@@ -93,5 +108,26 @@ mod tests {
         let out = to_mono_16k(&[0.0, 1.0, 0.0, 1.0], 1, 8_000);
         assert_eq!(out.len(), 8);
         assert!((out[1] - 0.5).abs() < 1e-6);
+    }
+}
+
+/// Samples per level frame (16 ms).
+pub const LEVEL_FRAME: usize = 256;
+
+/// Cuts a sample stream into frames and reports the RMS of each completed one.
+#[derive(Default)]
+pub struct FrameMeter {
+    pending: Vec<f32>,
+}
+
+impl FrameMeter {
+    pub fn push(&mut self, samples: &[f32]) -> Vec<f32> {
+        self.pending.extend_from_slice(samples);
+        let frames = self.pending.chunks_exact(LEVEL_FRAME);
+        let levels =
+            frames.clone().map(|f| (f.iter().map(|s| s * s).sum::<f32>() / LEVEL_FRAME as f32).sqrt()).collect();
+        let used = frames.len() * LEVEL_FRAME;
+        self.pending.drain(..used);
+        levels
     }
 }

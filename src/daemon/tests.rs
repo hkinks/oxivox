@@ -146,16 +146,16 @@ fn dictation_ends_in_a_paste_into_the_original_window() {
 }
 
 #[test]
-fn leading_silence_is_dropped_and_columns_reach_the_overlay() {
+fn leading_silence_is_dropped_and_levels_reach_the_overlay() {
     let mut h = harness("x");
     h.request(Command::Toggle);
     h.daemon.on_capture(CaptureEvent::Samples(vec![0.0; 8000]));
     assert_eq!(h.daemon.recording.samples.len(), 0);
     h.tone(0.5);
     assert_eq!(h.daemon.recording.samples.len(), 8000);
-    let columns: usize =
-        h.overlay.0.lock().unwrap().iter().map(|cmd| if let OverlayCmd::Columns(c) = cmd { c.len() } else { 0 }).sum();
-    assert!(columns > 20, "{columns} columns");
+    let levels: usize =
+        h.overlay.0.lock().unwrap().iter().map(|cmd| if let OverlayCmd::Levels(c) = cmd { c.len() } else { 0 }).sum();
+    assert!(levels > 20, "{levels} levels");
 }
 
 #[test]

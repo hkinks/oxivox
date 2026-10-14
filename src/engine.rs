@@ -6,20 +6,30 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters, WhisperState};
 
-use crate::spectrogram::SAMPLE_RATE;
+use crate::audio::SAMPLE_RATE;
 
 pub trait Engine: Send {
     /// Raw transcript of 16 kHz mono audio. Returns early with an error once `cancel` is set.
     fn transcribe(&mut self, audio: &[f32], cancel: &Arc<AtomicBool>) -> Result<String>;
+
+    /// Runs a throwaway transcription so that one-time costs do not land on the first dictation.
+    fn warm_up(&mut self) -> Result<()> {
+        Ok(())
+    }
 }
+
+/// A short spoken sentence for [`Engine::warm_up`].
+const WARM_UP_WAV: &[u8] = include_bytes!("../assets/warmup.wav");
 
 /// whisper.cpp keeps the model on the GPU for the lifetime of this value.
 pub struct WhisperEngine {
     // The state holds its own reference to the context's weights; keep the context alive regardless.
     _ctx: WhisperContext,
     state: WhisperState,
-    language: Option<String>,
+    pub language: Option<String>,
     threads: i32,
+    /// Beam search width; 1 means greedy decoding.
+    pub beam: i32,
 }
 
 impl WhisperEngine {
@@ -42,11 +52,25 @@ impl WhisperEngine {
         let state = ctx.create_state().map_err(|e| anyhow::anyhow!("{e:?}")).context("creating whisper state")?;
         // The GPU does the heavy work; the CPU path wants every core it can get.
         let threads = if gpu { 4 } else { std::thread::available_parallelism().map_or(4, |n| n.get().min(8)) as i32 };
-        Ok(Self { _ctx: ctx, state, language: language.map(String::from), threads })
+        Ok(Self { _ctx: ctx, state, language: language.map(String::from), threads, beam: 5 })
+    }
+}
+
+impl WhisperEngine {
+    pub fn print_timings(&self) {
+        self._ctx.print_timings();
     }
 }
 
 impl Engine for WhisperEngine {
+    /// ggml-vulkan compiles its shaders on first use. With a cold driver shader cache that takes 10 to 15 s,
+    /// which would otherwise be the wait of the first dictation after every cache eviction.
+    fn warm_up(&mut self) -> Result<()> {
+        let audio = crate::audio::read_wav_from(WARM_UP_WAV)?;
+        self.transcribe(&audio, &Arc::default())?;
+        Ok(())
+    }
+
     fn transcribe(&mut self, audio: &[f32], cancel: &Arc<AtomicBool>) -> Result<String> {
         // whisper.cpp rejects input shorter than a second.
         let mut padded;
@@ -58,7 +82,12 @@ impl Engine for WhisperEngine {
             audio
         };
 
-        let mut params = FullParams::new(SamplingStrategy::BeamSearch { beam_size: 5, patience: -1.0 });
+        let strategy = if self.beam > 1 {
+            SamplingStrategy::BeamSearch { beam_size: self.beam, patience: -1.0 }
+        } else {
+            SamplingStrategy::Greedy { best_of: 1 }
+        };
+        let mut params = FullParams::new(strategy);
         params.set_language(self.language.as_deref());
         params.set_n_threads(self.threads);
         params.set_translate(false);

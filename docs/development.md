@@ -14,7 +14,7 @@ cargo test --release -- --ignored          # engine test: needs the model and fr
 ## Trying it
 
 ```sh
-rustle transcribe tests/data/fox.wav       # engine check without a microphone; --cpu if the GPU is full
+rustle transcribe assets/warmup.wav       # engine check without a microphone; --cpu if the GPU is full
 rustle overlay-demo                        # overlay with synthetic audio, no model, no microphone
 rustle daemon                              # loads the model, shows the overlay on demand
 rustle toggle                              # start recording; run again to transcribe and paste
@@ -25,7 +25,7 @@ rustle status
 `contrib/` has a Hyprland bind snippet (including the Escape submap), a systemd user unit and example
 `config.toml` / `theme.toml`.
 
-Overlay on Hyprland (`rustle overlay-demo`): warming up, recording, transcribing, error flash.
+Overlay on Hyprland (`rustle overlay-demo`): warming up, recording, transcribing, error flash. The dots follow the voice level with automatic gain.
 
 ![overlay states](overlay-states.png)
 
@@ -38,4 +38,12 @@ Overlay on Hyprland (`rustle overlay-demo`): warming up, recording, transcribing
 | `src/platform/` | one trait per desktop concern (`mod.rs`), Hyprland / PipeWire / layer-shell implementations |
 | `src/overlay/` | overlay model and tiny-skia drawing, independent of the windowing system |
 | `src/engine.rs` | `Engine` trait and the whisper.cpp implementation |
-| `src/spectrogram.rs`, `src/tokens.rs`, `src/audio.rs` | FFT bands, non-speech token cleanup, energy gate and WAV loading |
+| `src/overlay/dots.rs` | voice level to dot sizes: automatic gain, outward ripple, easing |
+| `src/tokens.rs`, `src/audio.rs` | non-speech token cleanup; level frames, energy gate, WAV loading |
+
+## Speed notes
+
+Warm, a 10 s dictation takes about 0.25 s from stop to text on the RTX 5090. The first transcription in a process can
+cost 10 to 15 s when the NVIDIA shader cache misses (ggml-vulkan compiles its shaders on first use), so the daemon
+runs a warm-up transcription on its engine thread right after loading. `rustle bench <wav> --runs 3 --pause 8` measures
+runs; `__GL_SHADER_DISK_CACHE=0` simulates a cold cache.

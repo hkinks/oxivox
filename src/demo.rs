@@ -3,24 +3,23 @@
 use anyhow::Result;
 use std::time::Duration;
 
+use crate::audio::{FrameMeter, LEVEL_FRAME, SAMPLE_RATE};
 use crate::config::Config;
 use crate::overlay::{FlashKind, FlashMessage, Overlay, OverlayCmd, Surface, View, text};
 use crate::paths;
 use crate::platform::wayland::LayerShellSurface;
-use crate::spectrogram::{Analyzer, HOP, SAMPLE_RATE};
 use crate::theme::Theme;
 
-/// A wandering pair of tones with a slow syllable-like envelope.
+/// Syllable-like bursts with pauses, at the level of headset speech in call mode (peaks around -15 dBFS).
 fn voice(sample: usize) -> f32 {
     let t = sample as f32 / SAMPLE_RATE as f32;
-    let envelope = (0.5 + 0.5 * (t * 7.0).sin()).powi(2);
-    let pitch = 180.0 + 60.0 * (t * 2.3).sin();
+    let syllables = (0.5 + 0.5 * (t * 9.0).sin()).powi(2);
+    let phrase = (0.5 + 0.5 * (t * 1.3).sin()).powf(0.5);
     let tau = std::f32::consts::TAU;
-    envelope
-        * 0.15
-        * ((tau * pitch * t).sin()
-            + 0.6 * (tau * pitch * 3.0 * t).sin()
-            + 0.4 * (tau * (900.0 + 400.0 * (t * 1.7).sin()) * t).sin())
+    syllables
+        * phrase
+        * 0.18
+        * ((tau * 190.0 * t).sin() + 0.5 * (tau * 570.0 * t).sin() + 0.3 * (tau * 1300.0 * t).sin())
 }
 
 pub fn run(record_secs: f32) -> Result<()> {
@@ -32,14 +31,14 @@ pub fn run(record_secs: f32) -> Result<()> {
     std::thread::sleep(Duration::from_millis(1200));
     sink.send(OverlayCmd::Show(View::Recording));
 
-    let mut analyzer = Analyzer::new();
+    let mut meter = FrameMeter::default();
     let mut sample = 0;
-    let frames = (record_secs * SAMPLE_RATE as f32) as usize / HOP;
+    let frames = (record_secs * SAMPLE_RATE as f32) as usize / LEVEL_FRAME;
     for _ in 0..frames {
-        let chunk: Vec<f32> = (sample..sample + HOP).map(voice).collect();
-        sample += HOP;
-        sink.send(OverlayCmd::Columns(analyzer.push(&chunk)));
-        std::thread::sleep(Duration::from_secs_f32(HOP as f32 / SAMPLE_RATE as f32));
+        let chunk: Vec<f32> = (sample..sample + LEVEL_FRAME).map(voice).collect();
+        sample += LEVEL_FRAME;
+        sink.send(OverlayCmd::Levels(meter.push(&chunk)));
+        std::thread::sleep(Duration::from_secs_f32(LEVEL_FRAME as f32 / SAMPLE_RATE as f32));
     }
 
     sink.send(OverlayCmd::Show(View::Transcribing));

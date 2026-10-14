@@ -6,13 +6,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::time::{Duration, Instant};
 
-use crate::audio;
+use crate::audio::{self, FrameMeter, SAMPLE_RATE};
 use crate::config::Config;
 use crate::engine::Engine;
 use crate::ipc::{Command, Request};
 use crate::overlay::{FlashKind, FlashMessage, OverlayCmd, OverlaySink, View};
 use crate::platform::{CancelKey, Capture, CaptureEvent, Focus, Media, Output, Window};
-use crate::spectrogram::{Analyzer, SAMPLE_RATE};
 use crate::state::{Action, Event, Flash, MicFailure, Outcome, State, step};
 use crate::tokens;
 
@@ -48,7 +47,7 @@ struct Recording {
     /// Real (non-zero) audio has arrived.
     live: bool,
     stream_up: bool,
-    analyzer: Analyzer,
+    meter: FrameMeter,
     target: Option<Window>,
 }
 
@@ -94,8 +93,15 @@ impl Daemon {
             .name("engine".into())
             .spawn(move || {
                 let mut engine = engine;
+                let started = Instant::now();
+                match engine.warm_up() {
+                    Ok(()) => tracing::info!(seconds = started.elapsed().as_secs_f32(), "engine warmed up"),
+                    Err(e) => tracing::warn!("engine warm-up failed: {e:#}"),
+                }
                 for job in job_rx {
+                    let started = Instant::now();
                     let result = engine.transcribe(&job.audio, &job.cancel);
+                    tracing::info!(seconds = started.elapsed().as_secs_f32(), "engine finished");
                     if results.send(Msg::Transcribed { job: job.id, result }).is_err() {
                         break;
                     }
@@ -175,9 +181,9 @@ impl Daemon {
                     self.apply(Event::MicLive);
                 }
                 self.recording.samples.extend_from_slice(audible);
-                let columns = self.recording.analyzer.push(audible);
-                if !columns.is_empty() {
-                    self.platform.overlay.send(OverlayCmd::Columns(columns));
+                let levels = self.recording.meter.push(audible);
+                if !levels.is_empty() {
+                    self.platform.overlay.send(OverlayCmd::Levels(levels));
                 }
             }
         }
