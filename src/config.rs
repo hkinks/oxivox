@@ -16,6 +16,8 @@ pub struct Config {
     pub max_length_secs: u64,
     /// Run the model on the GPU (Vulkan). CPU is far slower and meant for machines without a usable GPU.
     pub gpu: bool,
+    /// When the GPU lacks the free memory for the model, run on the CPU instead of exiting with an error.
+    pub gpu_fallback_cpu: bool,
     /// PipeWire node name or serial of the microphone; the default source when unset.
     pub source: Option<String>,
     /// Media players (MPRIS names such as "vlc") that are never paused while recording.
@@ -54,6 +56,7 @@ impl Default for Config {
             language: "auto".into(),
             max_length_secs: 300,
             gpu: true,
+            gpu_fallback_cpu: false,
             source: None,
             media_ignore: Vec::new(),
             overlay: OverlayConfig::default(),
@@ -74,9 +77,19 @@ impl Default for PasteConfig {
         Self {
             keys: "CTRL".into(),
             terminal_keys: "CTRL SHIFT".into(),
-            terminal_classes: ["ghostty", "alacritty", "kitty", "foot", "konsole", "terminal", "wezterm"]
-                .map(String::from)
-                .to_vec(),
+            terminal_classes: [
+                "ghostty",
+                "kitty",
+                "alacritty",
+                "foot",
+                "konsole",
+                "wezterm",
+                "gnome-terminal",
+                "org.gnome.terminal",
+                "xterm",
+            ]
+            .map(String::from)
+            .to_vec(),
             classes: HashMap::new(),
         }
     }
@@ -176,6 +189,43 @@ mod tests {
         assert_eq!(c.modifiers_for("chromium-browser"), "CTRL");
         c.classes.insert("Emacs".into(), "ALT".into());
         assert_eq!(c.modifiers_for("emacs"), "ALT");
+    }
+
+    #[test]
+    fn terminals_paste_with_ctrl_shift_and_other_windows_with_ctrl() {
+        let c = Config::default().paste;
+        for class in [
+            "ghostty",
+            "com.mitchellh.ghostty",
+            "kitty",
+            "Alacritty",
+            "foot",
+            "footclient",
+            "org.kde.konsole",
+            "org.wezfurlong.wezterm",
+            "gnome-terminal-server",
+            "org.gnome.Terminal",
+            "XTerm",
+            "UXTerm",
+        ] {
+            assert_eq!(c.modifiers_for(class), "CTRL SHIFT", "{class}");
+        }
+        for class in ["chromium", "firefox", "code", "org.telegram.desktop", "obsidian", "discord", ""] {
+            assert_eq!(c.modifiers_for(class), "CTRL", "{class}");
+        }
+    }
+
+    #[test]
+    fn terminal_classes_are_configurable() {
+        let c = Config::parse("[paste]\nterminal_classes = [\"myterm\"]\n").unwrap().paste;
+        assert_eq!(c.modifiers_for("MyTerm"), "CTRL SHIFT");
+        assert_eq!(c.modifiers_for("ghostty"), "CTRL");
+    }
+
+    #[test]
+    fn gpu_fallback_is_off_by_default() {
+        assert!(!Config::default().gpu_fallback_cpu);
+        assert!(Config::parse("gpu_fallback_cpu = true").unwrap().gpu_fallback_cpu);
     }
 
     #[test]
