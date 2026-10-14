@@ -177,7 +177,8 @@ impl Overlay {
         let eased = 1.0 - (1.0 - opacity).powi(2);
         let scale = POP_SCALE + (1.0 - POP_SCALE) * eased;
         let (cx, cy) = (pixmap.width() as f32 / 2.0, pixmap.height() as f32 / 2.0);
-        let paint = tiny_skia::PixmapPaint { opacity, quality: tiny_skia::FilterQuality::Bilinear, ..Default::default() };
+        let paint =
+            tiny_skia::PixmapPaint { opacity, quality: tiny_skia::FilterQuality::Bilinear, ..Default::default() };
         let tf = tiny_skia::Transform::from_translate(cx, cy).pre_scale(scale, scale).pre_translate(-cx, -cy);
         pixmap.draw_pixmap(0, 0, full.as_ref(), &paint, tf, None);
     }

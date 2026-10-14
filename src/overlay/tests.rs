@@ -273,7 +273,8 @@ fn fades_in_and_out_and_stops_when_hidden() {
     let mut o = overlay_with_font();
     let now = Instant::now();
     o.apply(OverlayCmd::Show(View::WarmingUp), now);
-    let alpha_at = |o: &Overlay, t| snapshot("fade", o, t, 1.0).data().iter().skip(3).step_by(4).map(|&a| a as u32).sum::<u32>();
+    let alpha_at =
+        |o: &Overlay, t| snapshot("fade", o, t, 1.0).data().iter().skip(3).step_by(4).map(|&a| a as u32).sum::<u32>();
     let (start, half, full) = (
         alpha_at(&o, now),
         alpha_at(&o, now + Duration::from_millis(60)),
