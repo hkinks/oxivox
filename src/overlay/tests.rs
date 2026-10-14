@@ -196,7 +196,11 @@ fn theme_change_applies() {
     o.apply(OverlayCmd::Theme(orange.clone()), end);
     let pm = snapshot("recording-orange", &o, end, 1);
     let blue = Theme::default().accent;
-    let tinted = (0..19).any(|i| (10..46).any(|y| distance(pixel(&pm, dot_x(i - 9), y), orange.accent) < distance(pixel(&pm, dot_x(i - 9), y), blue) - 100));
+    let tinted = (0..19).any(|i| {
+        (10..46).any(|y| {
+            distance(pixel(&pm, dot_x(i - 9), y), orange.accent) < distance(pixel(&pm, dot_x(i - 9), y), blue) - 100
+        })
+    });
     assert!(tinted);
 }
 
