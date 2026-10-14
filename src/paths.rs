@@ -1,0 +1,37 @@
+//! XDG locations used by wisprs.
+
+use std::path::PathBuf;
+
+fn home() -> PathBuf {
+    std::env::var_os("HOME").map(PathBuf::from).unwrap_or_default()
+}
+
+fn xdg(var: &str, fallback: &str) -> PathBuf {
+    match std::env::var_os(var) {
+        Some(dir) if !dir.is_empty() => PathBuf::from(dir),
+        _ => home().join(fallback),
+    }
+}
+
+pub fn config_dir() -> PathBuf {
+    xdg("XDG_CONFIG_HOME", ".config").join("wisprs")
+}
+
+pub fn data_dir() -> PathBuf {
+    xdg("XDG_DATA_HOME", ".local/share")
+}
+
+pub fn socket_path() -> PathBuf {
+    let runtime = std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
+    runtime.join("wisprs.sock")
+}
+
+/// Default model locations, in order of preference.
+pub fn model_candidates() -> Vec<PathBuf> {
+    const FILE: &str = "ggml-large-v3-turbo.bin";
+    let data = data_dir();
+    vec![
+        data.join("wisprs/models").join(FILE),
+        data.join("voxtype/models").join(FILE),
+    ]
+}
