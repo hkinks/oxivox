@@ -71,9 +71,10 @@ in
           ExecStart = "${lib.getExe cfg.package} daemon";
           Restart = "on-failure";
           RestartSec = 3;
-          # rustle shells out to wl-copy/wl-paste, playerctl and fc-match; user services get a minimal PATH
+          # rustle shells out to wl-copy/wl-paste, playerctl, fc-match and pw-dump; wl-copy itself runs `cat` (coreutils).
+          # This replaces the whole PATH, so everything needed must be listed
           Environment = [
-            "PATH=${lib.makeBinPath (with pkgs; [ wl-clipboard playerctl fontconfig ])}"
+            "PATH=${lib.makeBinPath (with pkgs; [ wl-clipboard playerctl fontconfig pipewire coreutils ])}"
           ];
         };
         Install.WantedBy = [ "graphical-session.target" ];
