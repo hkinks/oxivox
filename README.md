@@ -50,6 +50,38 @@ Hyprland example:
 bind = ALT, SPACE, exec, rustle toggle
 ```
 
+## NixOS / Home Manager
+
+The flake exports a Home Manager module that installs the package, runs `rustle daemon` as a systemd user service
+and writes the config files:
+
+```nix
+{
+  inputs.rustle.url = "github:hannes/rustle";   # or a local path
+
+  # in your Home Manager configuration
+  imports = [ inputs.rustle.homeManagerModules.default ];
+
+  services.rustle = {
+    enable = true;
+    settings = { language = "en"; media_ignore = [ "vlc" ]; };   # config.toml
+    # theme = { accent = "#7aa2f7"; };                           # theme.toml; null (default) leaves it unmanaged
+    hyprland.enable = true;                                      # binds Alt+Space and the Escape submap
+  };
+}
+```
+
+| option | default | meaning |
+|---|---|---|
+| `enable` | `false` | install the package and run the user service |
+| `package` | the flake's package | the rustle package |
+| `settings` | `{ }` | `config.toml` (omitted when empty) |
+| `theme` | `null` | `theme.toml`; null leaves it to Noctalia or you |
+| `hyprland.enable` | `false` | add the binds to `wayland.windowManager.hyprland` and set `settings.cancel_submap = "rustle"` |
+| `hyprland.toggleBind` | `"ALT, SPACE"` | the dictation key, also bound inside the `rustle` submap so a recording can be stopped |
+
+The Hyprland integration uses `wayland.windowManager.hyprland.submaps` (Home Manager 26.05 or newer).
+
 ## Building
 
 With Nix:

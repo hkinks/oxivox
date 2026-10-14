@@ -29,6 +29,14 @@ Overlay on Hyprland (`rustle overlay-demo`): warming up, recording, transcribing
 
 ![overlay states](overlay-states.png)
 
+## Home Manager module
+
+`nix/home-manager.nix` is exported as `homeManagerModules.default` (alias `rustle`) by `flake.nix`; usage is in the
+README. To check it, build a throwaway Home Manager configuration that imports it (home-manager `release-26.05`,
+`wayland.windowManager.hyprland.configType = "hyprlang"`) and inspect `xdg.configFile."rustle/config.toml"`,
+`hypr/hyprland.conf` and the `rustle.service` unit. `nix eval .#homeManagerModules.default` only proves it is a function.
+Keep the module's `settings` in step with the keys in `src/config.rs`.
+
 ## Layout
 
 | path | role |
