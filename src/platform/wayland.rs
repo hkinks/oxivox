@@ -8,7 +8,13 @@ use smithay_client_toolkit::reexports::calloop::{self, EventLoop};
 use smithay_client_toolkit::reexports::calloop_wayland_source::WaylandSource;
 use smithay_client_toolkit::reexports::client::globals::registry_queue_init;
 use smithay_client_toolkit::reexports::client::protocol::{wl_output, wl_shm, wl_surface};
-use smithay_client_toolkit::reexports::client::{Connection, QueueHandle};
+use smithay_client_toolkit::reexports::client::{Connection, Dispatch, QueueHandle};
+use smithay_client_toolkit::reexports::protocols::wp::fractional_scale::v1::client::wp_fractional_scale_manager_v1::WpFractionalScaleManagerV1;
+use smithay_client_toolkit::reexports::protocols::wp::fractional_scale::v1::client::wp_fractional_scale_v1::{
+    self, WpFractionalScaleV1,
+};
+use smithay_client_toolkit::reexports::protocols::wp::viewporter::client::wp_viewport::WpViewport;
+use smithay_client_toolkit::reexports::protocols::wp::viewporter::client::wp_viewporter::WpViewporter;
 use smithay_client_toolkit::registry::{ProvidesRegistryState, RegistryState};
 use smithay_client_toolkit::shell::WaylandSurface;
 use smithay_client_toolkit::shell::wlr_layer::{
@@ -66,6 +72,9 @@ fn setup(overlay: Overlay, commands: calloop::channel::Channel<OverlayCmd>) -> R
     let layer_shell = LayerShell::bind(&globals, &qh).context("the compositor does not support wlr-layer-shell")?;
     let shm = Shm::bind(&globals, &qh).context("wl_shm is missing")?;
     let pool = SlotPool::new(1 << 16, &shm).context("creating shm pool")?;
+    // Without both, the overlay falls back to the compositor's integer scale.
+    let fractional_scale = globals.bind::<WpFractionalScaleManagerV1, _, _>(&qh, 1..=1, ()).ok();
+    let viewporter = globals.bind::<WpViewporter, _, _>(&qh, 1..=1, ()).ok();
 
     let event_loop: EventLoop<App> = EventLoop::try_new()?;
     WaylandSource::new(conn, event_queue).insert(event_loop.handle()).map_err(|e| anyhow!("{e}"))?;
@@ -86,12 +95,16 @@ fn setup(overlay: Overlay, commands: calloop::channel::Channel<OverlayCmd>) -> R
         layer_shell,
         shm,
         pool,
+        fractional_scale,
+        viewporter,
+        fractional: None,
+        viewport: None,
         qh,
         overlay,
         layer: None,
         configured: false,
         frame_pending: false,
-        scale: 1,
+        scale: 1.0,
         pixmap: None,
         exit: false,
     };
@@ -105,12 +118,18 @@ struct App {
     layer_shell: LayerShell,
     shm: Shm,
     pool: SlotPool,
+    fractional_scale: Option<WpFractionalScaleManagerV1>,
+    viewporter: Option<WpViewporter>,
+    /// Per-surface objects of the fractional scale protocol; they live as long as the layer.
+    fractional: Option<WpFractionalScaleV1>,
+    viewport: Option<WpViewport>,
     qh: QueueHandle<App>,
     overlay: Overlay,
     layer: Option<LayerSurface>,
     configured: bool,
     frame_pending: bool,
-    scale: i32,
+    /// Output scale, 1.5 for 150 %; whole numbers unless the compositor speaks fractional-scale-v1.
+    scale: f32,
     pixmap: Option<Pixmap>,
     exit: bool,
 }
@@ -141,7 +160,15 @@ impl App {
             Ok(region) => layer.wl_surface().set_input_region(Some(region.wl_region())),
             Err(e) => tracing::warn!("cannot make surface click-through: {e}"),
         }
-        layer.wl_surface().set_buffer_scale(self.scale);
+        if let (Some(manager), Some(viewporter)) = (&self.fractional_scale, &self.viewporter) {
+            // The buffer is sized in device pixels and mapped onto the logical size by the viewport.
+            self.fractional = Some(manager.get_fractional_scale(layer.wl_surface(), &self.qh, ()));
+            let viewport = viewporter.get_viewport(layer.wl_surface(), &self.qh, ());
+            viewport.set_destination(width as i32, height as i32);
+            self.viewport = Some(viewport);
+        } else {
+            layer.wl_surface().set_buffer_scale(self.scale as i32);
+        }
         layer.commit();
         self.layer = Some(layer);
         self.configured = false;
@@ -149,6 +176,12 @@ impl App {
     }
 
     fn destroy_layer(&mut self) {
+        if let Some(fractional) = self.fractional.take() {
+            fractional.destroy();
+        }
+        if let Some(viewport) = self.viewport.take() {
+            viewport.destroy();
+        }
         self.layer = None;
         self.configured = false;
         self.frame_pending = false;
@@ -163,8 +196,7 @@ impl App {
         }
         let Some(layer) = &self.layer else { return };
         let (width, height) = self.overlay.size();
-        let scale = self.scale.max(1) as u32;
-        let (pw, ph) = (width * scale, height * scale);
+        let (pw, ph) = ((width as f32 * self.scale).round() as u32, (height as f32 * self.scale).round() as u32);
         let pixmap = match &mut self.pixmap {
             Some(p) if p.width() == pw && p.height() == ph => p,
             slot => slot.insert(Pixmap::new(pw, ph).expect("overlay size is non-zero")),
@@ -202,8 +234,11 @@ impl CompositorHandler for App {
         surface: &wl_surface::WlSurface,
         factor: i32,
     ) {
-        self.scale = factor.max(1);
-        surface.set_buffer_scale(self.scale);
+        if self.viewport.is_some() {
+            return;
+        }
+        self.scale = factor.max(1) as f32;
+        surface.set_buffer_scale(factor.max(1));
         if self.configured {
             self.draw();
         }
@@ -284,3 +319,27 @@ impl ProvidesRegistryState for App {
 }
 
 smithay_client_toolkit::delegate_dispatch2!(App);
+
+impl Dispatch<WpFractionalScaleV1, ()> for App {
+    fn event(
+        app: &mut Self,
+        _: &WpFractionalScaleV1,
+        event: wp_fractional_scale_v1::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+        let wp_fractional_scale_v1::Event::PreferredScale { scale } = event else { return };
+        let scale = scale as f32 / 120.0;
+        if scale != app.scale {
+            app.scale = scale;
+            if app.configured {
+                app.draw();
+            }
+        }
+    }
+}
+
+smithay_client_toolkit::reexports::client::delegate_noop!(App: WpFractionalScaleManagerV1);
+smithay_client_toolkit::reexports::client::delegate_noop!(App: WpViewporter);
+smithay_client_toolkit::reexports::client::delegate_noop!(App: WpViewport);
