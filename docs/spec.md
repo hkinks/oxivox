@@ -68,10 +68,11 @@ Max recording length: config, default 300 s (stops and transcribes).
   dot, recovering over ~12 s), room noise stays at the smallest size. Warming up: small dim static dots. Transcribing:
   a soft pulse travels left to right. Error: text flash in the error colour. (A spectrogram was tried first and dropped
   2026-10-14: too faint at headset levels and too busy.)
-- 60 fps while visible, no rendering when hidden.
+- Appears with a 120 ms fade and scale-in, hides with a 150 ms fade. 60 fps while visible, no surface and no rendering when hidden.
+- HiDPI: rendered at the output scale, fractional ones too (fractional-scale-v1 with a viewport; integer buffer scale as fallback); the border stays a whole number of device pixels.
 - Palette: `background`, `surface`, `border`, `accent`, `text`, `error` from `$XDG_CONFIG_HOME/rustle/theme.toml`,
   reloaded on change (inotify). Noctalia writes this file through a user theme template
-  (`[theme.templates.user.rustle]`). Missing file: built-in Tokyo Night.
+  (`[theme.templates.user.rustle]`, template in `contrib/noctalia/`). Missing file: built-in Tokyo Night.
 
 ## Errors
 
