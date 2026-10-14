@@ -9,7 +9,7 @@ use crate::theme::{Color, Theme};
 
 const DOT_SPACING: f32 = 17.0;
 const DOT_MIN_RADIUS: f32 = 2.4;
-const DOT_MAX_RADIUS: f32 = 8.5;
+const DOT_MAX_RADIUS: f32 = 7.2;
 /// Wave period while transcribing.
 const WAVE_SECS: f32 = 1.6;
 const FLASH_DOT_X: f32 = 22.0;
@@ -17,7 +17,7 @@ const TEXT_LEFT: f32 = 40.0;
 const TEXT_RIGHT_MARGIN: f32 = 14.0;
 
 pub struct Scene<'a> {
-    /// Logical size; the pixmap may be larger by an integer scale.
+    /// Logical size; the pixmap is larger by the output scale (possibly fractional).
     pub size: (u32, u32),
     pub radius: f32,
     pub theme: &'a Theme,
@@ -65,11 +65,15 @@ pub fn render(pixmap: &mut Pixmap, scene: &Scene) {
     let theme = scene.theme;
 
     let flash_kind = if let View::Flash(f) = scene.view { Some(f.kind) } else { None };
-    if let Some(body) = rounded_rect(0.5, 0.5, w - 1.0, h - 1.0, scene.radius) {
-        pixmap.fill_path(&body, &paint(theme.background), FillRule::Winding, tf, None);
+    // The body is drawn in device pixels so the border is a whole number of them and stays crisp.
+    let border_width = scale.round().max(1.0);
+    let (dw, dh) = (pixmap.width() as f32, pixmap.height() as f32);
+    let inset = border_width / 2.0;
+    if let Some(body) = rounded_rect(inset, inset, dw - border_width, dh - border_width, scene.radius * scale) {
+        pixmap.fill_path(&body, &paint(theme.background), FillRule::Winding, Transform::identity(), None);
         let border = if flash_kind == Some(FlashKind::Error) { theme.error } else { theme.border };
-        let stroke = Stroke { width: 1.0, ..Stroke::default() };
-        pixmap.stroke_path(&body, &paint(border), &stroke, tf, None);
+        let stroke = Stroke { width: border_width, ..Stroke::default() };
+        pixmap.stroke_path(&body, &paint(border), &stroke, Transform::identity(), None);
     }
 
     match scene.view {
@@ -117,7 +121,7 @@ fn draw_row(pixmap: &mut Pixmap, tf: Transform, w: f32, h: f32, style: impl Fn(u
         let x = w / 2.0 + (i as f32 - (HALF - 1) as f32) * DOT_SPACING;
         let radius = DOT_MIN_RADIUS + (DOT_MAX_RADIUS - DOT_MIN_RADIUS) * size.clamp(0.0, 1.0).powf(0.8);
         if size > 0.35
-            && let Some(glow) = PathBuilder::from_circle(x, h / 2.0, radius + 3.0)
+            && let Some(glow) = PathBuilder::from_circle(x, h / 2.0, radius + 1.2)
         {
             pixmap.fill_path(&glow, &paint(colour.with_alpha(0.16 * size)), FillRule::Winding, tf, None);
         }

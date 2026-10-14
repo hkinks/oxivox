@@ -44,6 +44,30 @@ pub enum OverlayCmd {
 }
 
 const FLASH_DURATION: Duration = Duration::from_millis(1600);
+const FADE_IN: Duration = Duration::from_millis(120);
+const FADE_OUT: Duration = Duration::from_millis(150);
+/// Size of the overlay when fully transparent, as a fraction of its final size.
+const POP_SCALE: f32 = 0.94;
+
+/// Opacity of the overlay moving linearly from `from` to `to`; a reversal starts from wherever it is.
+#[derive(Debug, Clone, Copy)]
+struct Fade {
+    from: f32,
+    to: f32,
+    start: Instant,
+    duration: Duration,
+}
+
+impl Fade {
+    fn value(&self, now: Instant) -> f32 {
+        let t = now.saturating_duration_since(self.start).as_secs_f32() / self.duration.as_secs_f32();
+        self.from + (self.to - self.from) * t.clamp(0.0, 1.0)
+    }
+
+    fn done(&self, now: Instant) -> bool {
+        now.saturating_duration_since(self.start) >= self.duration
+    }
+}
 
 pub struct Overlay {
     config: OverlayConfig,
@@ -51,6 +75,9 @@ pub struct Overlay {
     view: View,
     dots: Dots,
     shown_at: Instant,
+    fade: Fade,
+    /// The view stays on screen, fading out, until the fade ends.
+    hiding: bool,
     flash_until: Option<Instant>,
     font: Option<Font>,
 }
@@ -63,6 +90,8 @@ impl Overlay {
             view: View::Hidden,
             dots: Dots::default(),
             shown_at: Instant::now(),
+            fade: Fade { from: 0.0, to: 0.0, start: Instant::now(), duration: FADE_IN },
+            hiding: false,
             flash_until: None,
             font,
         }
@@ -82,10 +111,16 @@ impl Overlay {
 
     pub fn apply(&mut self, cmd: OverlayCmd, now: Instant) {
         match cmd {
+            OverlayCmd::Show(View::Hidden) => self.start_hiding(now),
             OverlayCmd::Show(view) => {
+                let appearing = !self.is_visible() || self.hiding;
                 if !self.is_visible() || view == View::WarmingUp {
                     self.shown_at = now;
                     self.dots.reset();
+                }
+                if appearing {
+                    self.fade = Fade { from: self.opacity(now), to: 1.0, start: now, duration: FADE_IN };
+                    self.hiding = false;
                 }
                 self.flash_until = matches!(view, View::Flash(_)).then(|| now + FLASH_DURATION);
                 self.view = view;
@@ -95,11 +130,27 @@ impl Overlay {
         }
     }
 
-    /// Advances animations and hides a flash once its time is up.
+    fn start_hiding(&mut self, now: Instant) {
+        self.flash_until = None;
+        if self.is_visible() && !self.hiding {
+            self.fade = Fade { from: self.opacity(now), to: 0.0, start: now, duration: FADE_OUT };
+            self.hiding = true;
+        }
+    }
+
+    /// 0 when fully transparent, 1 when fully shown.
+    fn opacity(&self, now: Instant) -> f32 {
+        if self.is_visible() { self.fade.value(now) } else { 0.0 }
+    }
+
+    /// Advances animations; a flash starts fading out once its time is up, and a finished fade-out hides the view.
     pub fn tick(&mut self, now: Instant) {
         self.dots.animate(now);
         if self.flash_until.is_some_and(|until| now >= until) {
-            self.flash_until = None;
+            self.start_hiding(now);
+        }
+        if self.hiding && self.fade.done(now) {
+            self.hiding = false;
             self.view = View::Hidden;
         }
     }
@@ -114,7 +165,21 @@ impl Overlay {
             time: now.saturating_duration_since(self.shown_at).as_secs_f32(),
             font: self.font.as_ref(),
         };
-        draw::render(pixmap, &scene);
+        let opacity = self.opacity(now);
+        if opacity >= 1.0 {
+            draw::render(pixmap, &scene);
+            return;
+        }
+        // Fading: draw the finished picture off screen, then place it shrunken and translucent.
+        let Some(mut full) = Pixmap::new(pixmap.width(), pixmap.height()) else { return };
+        draw::render(&mut full, &scene);
+        pixmap.fill(tiny_skia::Color::TRANSPARENT);
+        let eased = 1.0 - (1.0 - opacity).powi(2);
+        let scale = POP_SCALE + (1.0 - POP_SCALE) * eased;
+        let (cx, cy) = (pixmap.width() as f32 / 2.0, pixmap.height() as f32 / 2.0);
+        let paint = tiny_skia::PixmapPaint { opacity, quality: tiny_skia::FilterQuality::Bilinear, ..Default::default() };
+        let tf = tiny_skia::Transform::from_translate(cx, cy).pre_scale(scale, scale).pre_translate(-cx, -cy);
+        pixmap.draw_pixmap(0, 0, full.as_ref(), &paint, tf, None);
     }
 }
 
