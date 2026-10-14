@@ -1,9 +1,13 @@
-# wisprs: design spec
+# rustle: design spec
 
 Superwhisper-quality dictation for Linux, written in Rust. Press a key, speak, press again: the text appears in the
 app you were in. A small themed overlay with a live spectrogram is the only thing on screen.
 
-Name: **wisprs** (crates.io name free on 2026-10-14). Backup name: **rustle**.
+Name: **rustle** (2026-10-14). The first pick, "wisprs", clashes with the commercial speech-to-text product wisprs.co
+(GitHub org `Wisprs`) and is one letter from Wispr Flow. crates.io `rustle` is an unrelated crate, so the Cargo package
+is `rustle-dictation`; the app and binary are `rustle`.
+
+Licence: MIT OR Apache-2.0.
 
 ## Goals and scope
 
@@ -21,13 +25,13 @@ Name: **wisprs** (crates.io name free on 2026-10-14). Backup name: **rustle**.
 - Escape cancels while recording or transcribing (only bound then, through a Hyprland submap).
 - Model: whisper large-v3-turbo (`ggml-large-v3-turbo.bin`) via whisper.cpp with the Vulkan backend, loaded once and
   kept in VRAM. Language comes from config (default: auto); the model decides what's possible.
-- Model path default: `~/.local/share/wisprs/models/ggml-large-v3-turbo.bin`, falling back to the voxtype copy in
+- Model path default: `~/.local/share/rustle/models/ggml-large-v3-turbo.bin`, falling back to the voxtype copy in
   `~/.local/share/voxtype/models/`.
 
 ## Architecture
 
 One process (daemon + overlay), a user service bound to the graphical session. A small CLI talks to it over a Unix
-socket at `$XDG_RUNTIME_DIR/wisprs.sock`.
+socket at `$XDG_RUNTIME_DIR/rustle.sock`.
 
 Portable core (no desktop dependencies): state machine, audio buffer, `Engine` trait + whisper implementation,
 spectrogram (FFT), overlay drawing into an RGBA pixel buffer (`tiny-skia`), config, palette.
@@ -36,7 +40,7 @@ Platform adapters, one trait each:
 
 | trait | Hyprland / Noctalia / NixOS (v1) | GNOME / KDE (later) | Windows / macOS (later) |
 |---|---|---|---|
-| `Trigger` | Hyprland bind runs `wisprs toggle` | GlobalShortcuts portal | native hotkey API |
+| `Trigger` | Hyprland bind runs `rustle toggle` | GlobalShortcuts portal | native hotkey API |
 | `Capture` | PipeWire (`pipewire` crate) | PipeWire | `cpal` |
 | `Surface` | wlr layer-shell via `smithay-client-toolkit`, shm buffer, click-through, no keyboard focus | KDE: layer-shell; GNOME: always-on-top window or Shell extension | `winit` + `softbuffer` |
 | `Output` | clipboard + Hyprland `sendshortcut` to the window focused at start | clipboard + RemoteDesktop portal | clipboard + SendInput / CGEvent |
@@ -62,9 +66,9 @@ Max recording length: config, default 300 s (stops and transcribes).
 - Content: scrolling spectrogram (or mirrored bar spectrum), ~3 s visible, log-frequency 80 Hz to 8 kHz, accent
   colour with intensity by magnitude; left a small state dot (warming / recording / transcribing).
 - 60 fps while visible, no rendering when hidden.
-- Palette: `background`, `surface`, `border`, `accent`, `text`, `error` from `$XDG_CONFIG_HOME/wisprs/theme.toml`,
+- Palette: `background`, `surface`, `border`, `accent`, `text`, `error` from `$XDG_CONFIG_HOME/rustle/theme.toml`,
   reloaded on change (inotify). Noctalia writes this file through a user theme template
-  (`[theme.templates.user.wisprs]`). Missing file: built-in Tokyo Night.
+  (`[theme.templates.user.rustle]`). Missing file: built-in Tokyo Night.
 
 ## Errors
 
@@ -78,7 +82,7 @@ Max recording length: config, default 300 s (stops and transcribes).
 
 ## Config
 
-`$XDG_CONFIG_HOME/wisprs/config.toml`: model path, language, max length, overlay size/position, paste keys per window
+`$XDG_CONFIG_HOME/rustle/config.toml`: model path, language, max length, overlay size/position, paste keys per window
 class. Every key optional.
 
 ## Testing
@@ -91,4 +95,4 @@ class. Every key optional.
 ## Packaging
 
 Nix flake: package (whisper.cpp built with Vulkan), dev shell, Home Manager module (user service, config, Hyprland
-binds snippet, Noctalia template). `/etc/nixos` imports it and drops voxtype once wisprs covers its features.
+binds snippet, Noctalia template). `/etc/nixos` imports it and drops voxtype once rustle covers its features.
