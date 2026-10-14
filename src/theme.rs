@@ -128,6 +128,19 @@ mod tests {
     }
 
     #[test]
+    fn noctalia_template_renders_to_a_valid_theme() {
+        // Stand-in for Noctalia's substitution: every `{{ token }}` becomes a colour.
+        let mut text = include_str!("../contrib/noctalia/rustle-theme.toml.tmpl").to_string();
+        while let Some(start) = text.find("{{") {
+            let end = text[start..].find("}}").expect("unclosed expression") + start + 2;
+            text.replace_range(start..end, "#abcdef");
+        }
+        let theme = Theme::parse(&text).unwrap();
+        assert_eq!(theme.accent, Color::rgb(0xab, 0xcd, 0xef));
+        assert_ne!(theme, Theme::default());
+    }
+
+    #[test]
     fn bad_colour_is_an_error() {
         assert!(Theme::parse("accent = \"blue\"").is_err());
     }
