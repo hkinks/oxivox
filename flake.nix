@@ -23,7 +23,7 @@
         shaderc
         git
       ];
-      runtimeTools = with pkgs; [ wl-clipboard playerctl fontconfig ];
+      runtimeTools = with pkgs; [ wl-clipboard playerctl fontconfig pipewire ];
     in {
       packages.${system} = rec {
         rustle = pkgs.rustPlatform.buildRustPackage {

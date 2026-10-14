@@ -20,8 +20,9 @@ use crate::config::Config;
 use crate::engine::{Engine, WhisperEngine};
 use crate::ipc::Command;
 use crate::overlay::{Overlay, Surface, text};
+use crate::platform::headset::PwDumpProbe;
 use crate::platform::hyprland::{Hyprland, HyprlandOutput, SubmapCancel};
-use crate::platform::media::Playerctl;
+use crate::platform::media::{MediaControl, Playerctl};
 use crate::platform::pipewire::PipewireCapture;
 use crate::platform::trigger::SocketTrigger;
 use crate::platform::wayland::LayerShellSurface;
@@ -173,7 +174,11 @@ fn run_daemon(dry_run: bool) -> Result<()> {
         } else {
             std::sync::Arc::new(HyprlandOutput::new(hypr, config.paste.clone()))
         },
-        media: Box::new(Playerctl::new(config.media_ignore.clone())),
+        media: Box::new(MediaControl::new(
+            std::sync::Arc::new(Playerctl),
+            std::sync::Arc::new(PwDumpProbe),
+            config.media_ignore.clone(),
+        )),
         cancel_key,
     };
     let (daemon, messages) = daemon::Daemon::new(config, platform, Box::new(engine));

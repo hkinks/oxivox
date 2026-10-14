@@ -1,5 +1,6 @@
 //! Interfaces to the desktop. Each has one implementation per platform; Hyprland comes first.
 
+pub mod headset;
 pub mod hyprland;
 pub mod media;
 pub mod pipewire;
