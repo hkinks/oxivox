@@ -1,7 +1,7 @@
 # rustle
 
 Local, private dictation for Linux. Press a key, speak, press it again: the text appears in the app you were typing
-in. A small overlay with a live spectrogram is the only thing on screen.
+in. A small overlay with a row of dots that follow your voice is the only thing on screen.
 
 Speech recognition runs on your own GPU with [whisper.cpp](https://github.com/ggml-org/whisper.cpp) (Whisper
 large-v3-turbo). Nothing leaves the machine.
@@ -13,7 +13,7 @@ large-v3-turbo). Nothing leaves the machine.
 - One hotkey: press to start, press again to transcribe and paste. Escape cancels.
 - Pastes into the window that was focused when you started, with the right paste shortcut for terminals and GUI apps;
   your clipboard is restored afterwards.
-- Overlay: click-through, never takes focus, live spectrogram, follows your desktop theme.
+- Overlay: click-through, never takes focus, dots that follow your voice, follows your desktop theme.
 - Bluetooth headsets: shows the mic warming up while the headset switches to call mode, so no words get lost.
 - Skips silent recordings instead of inventing text.
 - Pauses music while you speak.

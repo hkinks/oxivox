@@ -1,7 +1,7 @@
 # rustle: design spec
 
 Superwhisper-quality dictation for Linux, written in Rust. Press a key, speak, press again: the text appears in the
-app you were in. A small themed overlay with a live spectrogram is the only thing on screen.
+app you were in. A small themed overlay with a row of voice-driven dots is the only thing on screen.
 
 Name: **rustle** (2026-10-14). The first pick, "wisprs", clashes with the commercial speech-to-text product wisprs.co
 (GitHub org `Wisprs`) and is one letter from Wispr Flow. crates.io `rustle` is an unrelated crate, so the Cargo package
@@ -34,7 +34,7 @@ One process (daemon + overlay), a user service bound to the graphical session. A
 socket at `$XDG_RUNTIME_DIR/rustle.sock`.
 
 Portable core (no desktop dependencies): state machine, audio buffer, `Engine` trait + whisper implementation,
-spectrogram (FFT), overlay drawing into an RGBA pixel buffer (`tiny-skia`), config, palette.
+voice level meter with automatic gain, overlay drawing into an RGBA pixel buffer (`tiny-skia`), config, palette.
 
 Platform adapters, one trait each:
 
@@ -52,7 +52,7 @@ Platform adapters, one trait each:
 | step | daemon | overlay |
 |---|---|---|
 | `toggle` from idle | note focused window, open the default PipeWire source, buffer 16 kHz mono f32, pause MPRIS players | appears at once: **warming up** (dim flat line) |
-| mic live | first non-zero frames (Bluetooth call-mode switch ~1 s); leading all-zero audio is dropped | spectrogram in the accent colour |
+| mic live | first non-zero frames (Bluetooth call-mode switch ~1 s); leading all-zero audio is dropped | dots react to the voice, in the accent colour |
 | `toggle` while recording | close the stream (headset returns to music mode), run VAD energy check, then the engine | **transcribing** animation |
 | result | trim; drop whisper non-speech tokens (`[BLANK_AUDIO]`, `(music)` etc.); empty → no paste | hides; empty → brief "nothing heard" flash |
 | paste | save clipboard, set text, focus the step-1 window, send Ctrl+Shift+V (terminals) or Ctrl+V, restore clipboard after 500 ms, resume MPRIS | hidden |
@@ -63,8 +63,11 @@ Max recording length: config, default 300 s (stops and transcribes).
 ## Overlay
 
 - Size 360 x 56 logical px, bottom centre, 48 px above the bottom edge; rounded corners (radius 12), 1 px border.
-- Content: scrolling spectrogram (or mirrored bar spectrum), ~3 s visible, log-frequency 80 Hz to 8 kHz, accent
-  colour with intensity by magnitude; left a small state dot (warming / recording / transcribing).
+- Content: a centred row of 19 dots in the accent colour. Recording: the centre dot shows the current voice level and
+  older levels ripple outwards; dots grow fast and shrink slowly; automatic gain (the loudest recent speech is a full
+  dot, recovering over ~12 s), room noise stays at the smallest size. Warming up: small dim static dots. Transcribing:
+  a soft pulse travels left to right. Error: text flash in the error colour. (A spectrogram was tried first and dropped
+  2026-10-14: too faint at headset levels and too busy.)
 - 60 fps while visible, no rendering when hidden.
 - Palette: `background`, `surface`, `border`, `accent`, `text`, `error` from `$XDG_CONFIG_HOME/rustle/theme.toml`,
   reloaded on change (inotify). Noctalia writes this file through a user theme template
@@ -87,7 +90,7 @@ class. Every key optional.
 
 ## Testing
 
-- Unit: state machine transitions, non-speech token cleanup, spectrogram on synthetic sine input, overlay drawing
+- Unit: state machine transitions, non-speech token cleanup, level meter and automatic gain on synthetic input, overlay drawing
   into a buffer (snapshot of a few states), config/theme parsing.
 - Engine: one integration test on a short bundled WAV (ignored by default, needs the model + GPU).
 - Manual on the target desktop: latency from stop to paste, Bluetooth warm-up, clipboard restore, terminals vs GUI apps.
