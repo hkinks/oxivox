@@ -8,6 +8,8 @@ large-v3-turbo). Nothing leaves the machine.
 
 > Status: early development. The first target is Hyprland on NixOS; other desktops follow.
 
+![overlay states: warming up, mic live, silence, speech, error](docs/overlay-states.png)
+
 ## Features
 
 - One hotkey: press to start, press again to transcribe and paste. Escape cancels.
@@ -31,9 +33,16 @@ overlay drawing) is shared. See [docs/spec.md](docs/spec.md).
 
 ## Requirements
 
-- A GPU with Vulkan (CPU fallback planned)
+- A GPU with Vulkan; the CPU works too, much slower (`gpu = false` in the config)
 - PipeWire
-- The Whisper model `ggml-large-v3-turbo.bin` in `~/.local/share/rustle/models/`
+- A Wayland compositor with wlr layer-shell; Hyprland for the hotkey, focus and paste integration
+- The Whisper model `ggml-large-v3-turbo.bin` (about 1.6 GB) in `~/.local/share/rustle/models/`:
+
+```sh
+mkdir -p ~/.local/share/rustle/models
+curl -L -o ~/.local/share/rustle/models/ggml-large-v3-turbo.bin \
+  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin
+```
 
 ## Usage
 
@@ -44,11 +53,16 @@ rustle cancel      # bind to Escape while recording
 rustle transcribe recording.wav
 ```
 
-Hyprland example:
+`rustle status` prints the daemon's state, `rustle overlay-demo` shows the overlay with synthetic audio (no model, no
+microphone). Hyprland binds, including Escape-to-cancel through a submap, are in
+[contrib/hyprland.conf](contrib/hyprland.conf); a systemd user unit is in [contrib/rustle.service](contrib/rustle.service).
 
-```
-bind = ALT, SPACE, exec, rustle toggle
-```
+## Configuration
+
+Every key is optional. `$XDG_CONFIG_HOME/rustle/config.toml` sets the model path, language, maximum recording length,
+GPU use, microphone, overlay size and paste keys per window class; [contrib/config.toml](contrib/config.toml) lists all
+keys with their defaults. The overlay colours come from `$XDG_CONFIG_HOME/rustle/theme.toml`, reloaded on change; see
+[docs/theming.md](docs/theming.md) (including a Noctalia template).
 
 ## NixOS / Home Manager
 
@@ -57,7 +71,7 @@ and writes the config files:
 
 ```nix
 {
-  inputs.rustle.url = "github:hannes/rustle";   # or a local path
+  inputs.rustle.url = "github:hkinks/rustle";   # or a local path
 
   # in your Home Manager configuration
   imports = [ inputs.rustle.homeManagerModules.default ];
@@ -90,6 +104,10 @@ With Nix:
 nix build          # package
 nix develop        # dev shell with whisper.cpp, Vulkan and PipeWire build dependencies
 ```
+
+Without Nix you need a Rust toolchain (edition 2024), cmake, libclang, the Vulkan headers and loader, and the PipeWire,
+Wayland and xkbcommon development files; then `cargo build --release`. Tests and project layout are described in
+[docs/development.md](docs/development.md), the design in [docs/spec.md](docs/spec.md).
 
 ## Licence
 

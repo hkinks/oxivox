@@ -14,7 +14,7 @@ Licence: MIT OR Apache-2.0.
 | | |
 |---|---|
 | v1 scope | dictation only, done really well: hotkey, overlay, transcribe, paste |
-| first target | Hyprland on NixOS, Noctalia shell, Bluetooth headset (Sony WH-1000XM5) as the usual mic |
+| first target | Hyprland on NixOS, Noctalia shell, Bluetooth headset as the usual mic |
 | later targets | GNOME / KDE on Debian / Ubuntu; then Windows / macOS. The architecture keeps every desktop-specific part behind an interface |
 | not in v1 | LLM modes (rewrite, translate), history UI, settings UI, voice commands for an agent, live partial text |
 | offline | local model only, no network |
@@ -99,4 +99,4 @@ class. Every key optional.
 ## Packaging
 
 Nix flake: package (whisper.cpp built with Vulkan), dev shell, Home Manager module (user service, config, Hyprland
-binds snippet, Noctalia template). `/etc/nixos` imports it and drops voxtype once rustle covers its features.
+binds snippet, Noctalia template).
