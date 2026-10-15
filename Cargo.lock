@@ -712,6 +712,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
+name = "oxivox"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "fontdue",
+ "hound",
+ "notify",
+ "pipewire",
+ "serde",
+ "serde_json",
+ "smithay-client-toolkit",
+ "tiny-skia",
+ "toml 0.9.12+spec-1.1.0",
+ "tracing",
+ "tracing-subscriber",
+ "whisper-rs",
+]
+
+[[package]]
 name = "pin-project-lite"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -858,26 +878,6 @@ dependencies = [
  "libc",
  "linux-raw-sys",
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "rustle-dictation"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "fontdue",
- "hound",
- "notify",
- "pipewire",
- "serde",
- "serde_json",
- "smithay-client-toolkit",
- "tiny-skia",
- "toml 0.9.12+spec-1.1.0",
- "tracing",
- "tracing-subscriber",
- "whisper-rs",
 ]
 
 [[package]]

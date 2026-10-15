@@ -1,19 +1,19 @@
-# Home Manager module: `services.rustle.enable = true;`
+# Home Manager module: `services.oxivox.enable = true;`
 { self }:
 { config, lib, pkgs, ... }:
 let
-  cfg = config.services.rustle;
+  cfg = config.services.oxivox;
   tomlFormat = pkgs.formats.toml { };
 in
 {
-  options.services.rustle = {
-    enable = lib.mkEnableOption "the rustle dictation daemon";
+  options.services.oxivox = {
+    enable = lib.mkEnableOption "the oxivox dictation daemon";
 
     package = lib.mkOption {
       type = lib.types.package;
       default = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
-      defaultText = lib.literalExpression "rustle.packages.\${pkgs.stdenv.hostPlatform.system}.default";
-      description = "The rustle package to use.";
+      defaultText = lib.literalExpression "oxivox.packages.\${pkgs.stdenv.hostPlatform.system}.default";
+      description = "The oxivox package to use.";
     };
 
     settings = lib.mkOption {
@@ -27,8 +27,8 @@ in
         }
       '';
       description = ''
-        Contents of {file}`$XDG_CONFIG_HOME/rustle/config.toml`. Every key is optional; see
-        `contrib/config.toml` in the rustle repository for the keys and their defaults.
+        Contents of {file}`$XDG_CONFIG_HOME/oxivox/config.toml`. Every key is optional; see
+        `contrib/config.toml` in the oxivox repository for the keys and their defaults.
       '';
     };
 
@@ -40,13 +40,13 @@ in
         accent = "#7aa2f7";
       };
       description = ''
-        Contents of {file}`$XDG_CONFIG_HOME/rustle/theme.toml`. When null the file is not managed, so a theme
+        Contents of {file}`$XDG_CONFIG_HOME/oxivox/theme.toml`. When null the file is not managed, so a theme
         generator (for example Noctalia) or you can write it; the overlay reloads it when it changes.
       '';
     };
 
     hyprland = {
-      enable = lib.mkEnableOption "the rustle key bindings in `wayland.windowManager.hyprland`";
+      enable = lib.mkEnableOption "the oxivox key bindings in `wayland.windowManager.hyprland`";
 
       toggleBind = lib.mkOption {
         type = lib.types.str;
@@ -61,9 +61,9 @@ in
     {
       home.packages = [ cfg.package ];
 
-      systemd.user.services.rustle = {
+      systemd.user.services.oxivox = {
         Unit = {
-          Description = "rustle dictation daemon";
+          Description = "oxivox dictation daemon";
           PartOf = [ "graphical-session.target" ];
           After = [ "graphical-session.target" "pipewire.service" ];
         };
@@ -71,7 +71,7 @@ in
           ExecStart = "${lib.getExe cfg.package} daemon";
           Restart = "on-failure";
           RestartSec = 3;
-          # rustle shells out to wl-copy/wl-paste, playerctl, fc-match and pw-dump; wl-copy itself runs `cat` (coreutils).
+          # oxivox shells out to wl-copy/wl-paste, playerctl, fc-match and pw-dump; wl-copy itself runs `cat` (coreutils).
           # This replaces the whole PATH, so everything needed must be listed
           Environment = [
             "PATH=${lib.makeBinPath (with pkgs; [ wl-clipboard playerctl fontconfig pipewire coreutils ])}"
@@ -80,25 +80,25 @@ in
         Install.WantedBy = [ "graphical-session.target" ];
       };
 
-      xdg.configFile."rustle/config.toml" = lib.mkIf (cfg.settings != { }) {
-        source = tomlFormat.generate "rustle-config.toml" cfg.settings;
+      xdg.configFile."oxivox/config.toml" = lib.mkIf (cfg.settings != { }) {
+        source = tomlFormat.generate "oxivox-config.toml" cfg.settings;
       };
 
-      xdg.configFile."rustle/theme.toml" = lib.mkIf (cfg.theme != null) {
-        source = tomlFormat.generate "rustle-theme.toml" cfg.theme;
+      xdg.configFile."oxivox/theme.toml" = lib.mkIf (cfg.theme != null) {
+        source = tomlFormat.generate "oxivox-theme.toml" cfg.theme;
       };
     }
 
     (lib.mkIf cfg.hyprland.enable {
-      services.rustle.settings.cancel_submap = lib.mkDefault "rustle";
+      services.oxivox.settings.cancel_submap = lib.mkDefault "oxivox";
 
       wayland.windowManager.hyprland = {
-        settings.bind = [ "${cfg.hyprland.toggleBind}, exec, rustle toggle" ];
-        # Active only while rustle records or transcribes (the daemon switches in and out): Escape cancels, and the
+        settings.bind = [ "${cfg.hyprland.toggleBind}, exec, oxivox toggle" ];
+        # Active only while oxivox records or transcribes (the daemon switches in and out): Escape cancels, and the
         # toggle key must still work to stop a recording.
-        submaps.rustle.settings.bind = [
-          ", ESCAPE, exec, rustle cancel"
-          "${cfg.hyprland.toggleBind}, exec, rustle toggle"
+        submaps.oxivox.settings.bind = [
+          ", ESCAPE, exec, oxivox cancel"
+          "${cfg.hyprland.toggleBind}, exec, oxivox toggle"
         ];
       };
     })

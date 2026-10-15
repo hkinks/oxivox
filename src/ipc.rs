@@ -43,7 +43,7 @@ pub struct Request {
 /// Sends one command to the running daemon and returns its reply.
 pub fn send(socket: &Path, command: Command) -> Result<String> {
     let mut stream = UnixStream::connect(socket).with_context(|| {
-        format!("cannot reach the rustle daemon at {} (is `rustle daemon` running?)", socket.display())
+        format!("cannot reach the oxivox daemon at {} (is `oxivox daemon` running?)", socket.display())
     })?;
     stream.set_read_timeout(Some(Duration::from_secs(5)))?;
     writeln!(stream, "{}", command.name())?;

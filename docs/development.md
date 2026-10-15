@@ -8,24 +8,24 @@ nix develop
 export CARGO_BUILD_JOBS=6 CMAKE_BUILD_PARALLEL_LEVEL=6
 cargo build --release
 cargo test --release                       # unit tests, overlay snapshots (target/overlay-snapshots/*.png)
-cargo test --release -- --ignored          # engine test: needs the model and free GPU memory (RUSTLE_TEST_CPU=1 for CPU)
+cargo test --release -- --ignored          # engine test: needs the model and free GPU memory (OXIVOX_TEST_CPU=1 for CPU)
 ```
 
 ## Trying it
 
 ```sh
-rustle transcribe assets/warmup.wav       # engine check without a microphone; --cpu if the GPU is full
-rustle overlay-demo                        # overlay with synthetic audio, no model, no microphone
-rustle daemon                              # loads the model, shows the overlay on demand
-rustle toggle                              # start recording; run again to transcribe and paste
-rustle cancel                              # discard
-rustle status
+oxivox transcribe assets/warmup.wav       # engine check without a microphone; --cpu if the GPU is full
+oxivox overlay-demo                        # overlay with synthetic audio, no model, no microphone
+oxivox daemon                              # loads the model, shows the overlay on demand
+oxivox toggle                              # start recording; run again to transcribe and paste
+oxivox cancel                              # discard
+oxivox status
 ```
 
 `contrib/` has a Hyprland bind snippet (including the Escape submap), a systemd user unit and example
 `config.toml` / `theme.toml`; [theming.md](theming.md) covers the Noctalia template.
 
-Overlay on Hyprland (`rustle overlay-demo`): warming up (2 s), the live ping, silent recording, speech, transcribing, error flash. The dots follow the voice level with automatic gain.
+Overlay on Hyprland (`oxivox overlay-demo`): warming up (2 s), the live ping, silent recording, speech, transcribing, error flash. The dots follow the voice level with automatic gain.
 
 Top to bottom: warming up, the ping travelling outward, the ping's end, recording in silence, recording speech, error flash.
 
@@ -33,10 +33,10 @@ Top to bottom: warming up, the ping travelling outward, the ping's end, recordin
 
 ## Home Manager module
 
-`nix/home-manager.nix` is exported as `homeManagerModules.default` (alias `rustle`) by `flake.nix`; usage is in the
+`nix/home-manager.nix` is exported as `homeManagerModules.default` (alias `oxivox`) by `flake.nix`; usage is in the
 README. To check it, build a throwaway Home Manager configuration that imports it (home-manager `release-26.05`,
-`wayland.windowManager.hyprland.configType = "hyprlang"`) and inspect `xdg.configFile."rustle/config.toml"`,
-`hypr/hyprland.conf` and the `rustle.service` unit. `nix eval .#homeManagerModules.default` only proves it is a function.
+`wayland.windowManager.hyprland.configType = "hyprlang"`) and inspect `xdg.configFile."oxivox/config.toml"`,
+`hypr/hyprland.conf` and the `oxivox.service` unit. `nix eval .#homeManagerModules.default` only proves it is a function.
 Keep the module's `settings` in step with the keys in `src/config.rs`.
 
 ## Layout
@@ -55,5 +55,5 @@ Keep the module's `settings` in step with the keys in `src/config.rs`.
 
 Warm, a 10 s dictation takes about 0.25 s from stop to text on the RTX 5090. The first transcription in a process can
 cost 10 to 15 s when the NVIDIA shader cache misses (ggml-vulkan compiles its shaders on first use), so the daemon
-runs a warm-up transcription on its engine thread right after loading. `rustle bench <wav> --runs 3 --pause 8` measures
+runs a warm-up transcription on its engine thread right after loading. `oxivox bench <wav> --runs 3 --pause 8` measures
 runs; `__GL_SHADER_DISK_CACHE=0` simulates a cold cache.

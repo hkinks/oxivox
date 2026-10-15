@@ -32,7 +32,7 @@ use crate::theme::Theme;
 #[derive(Parser)]
 #[command(version, about = "Dictation: press a key, speak, press again, the text appears in the app you were in")]
 struct Cli {
-    /// Socket of the daemon (default: $XDG_RUNTIME_DIR/rustle.sock); lets a test daemon run beside the real one
+    /// Socket of the daemon (default: $XDG_RUNTIME_DIR/oxivox.sock); lets a test daemon run beside the real one
     #[arg(long, global = true, value_name = "PATH")]
     socket: Option<PathBuf>,
     #[command(subcommand)]
@@ -98,7 +98,7 @@ enum Action {
 
 fn main() -> Result<()> {
     tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "rustle=info".into()))
+        .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "oxivox=info".into()))
         .with_writer(std::io::stderr)
         .init();
     let cli = Cli::parse();

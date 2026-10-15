@@ -1,4 +1,4 @@
-//! `rustle overlay-demo`: walks the overlay through its states with synthetic audio, no microphone or model.
+//! `oxivox overlay-demo`: walks the overlay through its states with synthetic audio, no microphone or model.
 
 use anyhow::Result;
 use std::time::Duration;

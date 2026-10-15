@@ -1,4 +1,4 @@
-//! XDG locations used by rustle.
+//! XDG locations used by oxivox.
 
 use std::path::PathBuf;
 
@@ -14,25 +14,25 @@ fn xdg(var: &str, fallback: &str) -> PathBuf {
 }
 
 pub fn config_dir() -> PathBuf {
-    xdg("XDG_CONFIG_HOME", ".config").join("rustle")
+    xdg("XDG_CONFIG_HOME", ".config").join("oxivox")
 }
 
 pub fn data_dir() -> PathBuf {
     xdg("XDG_DATA_HOME", ".local/share")
 }
 
-/// `$RUSTLE_SOCKET` overrides the default; the `--socket` option overrides both.
+/// `$OXIVOX_SOCKET` overrides the default; the `--socket` option overrides both.
 pub fn socket_path() -> PathBuf {
-    if let Some(path) = std::env::var_os("RUSTLE_SOCKET") {
+    if let Some(path) = std::env::var_os("OXIVOX_SOCKET") {
         return PathBuf::from(path);
     }
     let runtime = std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
-    runtime.join("rustle.sock")
+    runtime.join("oxivox.sock")
 }
 
 /// Default model locations, in order of preference.
 pub fn model_candidates() -> Vec<PathBuf> {
     const FILE: &str = "ggml-large-v3-turbo.bin";
     let data = data_dir();
-    vec![data.join("rustle/models").join(FILE), data.join("voxtype/models").join(FILE)]
+    vec![data.join("oxivox/models").join(FILE), data.join("voxtype/models").join(FILE)]
 }

@@ -1,4 +1,4 @@
-//! Overlay palette. Read from `$XDG_CONFIG_HOME/rustle/theme.toml`, Tokyo Night when absent.
+//! Overlay palette. Read from `$XDG_CONFIG_HOME/oxivox/theme.toml`, Tokyo Night when absent.
 
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
@@ -130,7 +130,7 @@ mod tests {
     #[test]
     fn noctalia_template_renders_to_a_valid_theme() {
         // Stand-in for Noctalia's substitution: every `{{ token }}` becomes a colour.
-        let mut text = include_str!("../contrib/noctalia/rustle-theme.toml.tmpl").to_string();
+        let mut text = include_str!("../contrib/noctalia/oxivox-theme.toml.tmpl").to_string();
         while let Some(start) = text.find("{{") {
             let end = text[start..].find("}}").expect("unclosed expression") + start + 2;
             text.replace_range(start..end, "#abcdef");

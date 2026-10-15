@@ -1,14 +1,14 @@
 [package]
-name = "rustle-dictation"
+name = "oxivox"
 version = "0.1.0"
 edition = "2024"
 description = "Dictation for Linux: hotkey, themed overlay with live voice dots, local whisper transcription"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/hkinks/rustle"
+repository = "https://github.com/hkinks/oxivox"
 readme = "README.md"
 
 [[bin]]
-name = "rustle"
+name = "oxivox"
 path = "src/main.rs"
 
 [dependencies]

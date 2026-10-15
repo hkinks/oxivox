@@ -1,12 +1,12 @@
-# $XDG_CONFIG_HOME/rustle/config.toml: every key is optional; these are the defaults.
-# model = "/path/to/ggml-large-v3-turbo.bin"   # default: ~/.local/share/rustle/models, then the voxtype copy
+# $XDG_CONFIG_HOME/oxivox/config.toml: every key is optional; these are the defaults.
+# model = "/path/to/ggml-large-v3-turbo.bin"   # default: ~/.local/share/oxivox/models, then the voxtype copy
 language = "auto"
 max_length_secs = 300
 gpu = true
 gpu_fallback_cpu = false                    # too little free GPU memory for the model: use the CPU instead of exiting
 media_ignore = []                              # players never paused while recording, e.g. ["vlc"]
 # source = "alsa_input.usb-..."                # PipeWire node name of the microphone; default: the default source
-# cancel_submap = "rustle"                     # see hyprland.conf
+# cancel_submap = "oxivox"                     # see hyprland.conf
 
 [overlay]
 width = 360

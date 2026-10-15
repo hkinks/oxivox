@@ -1,5 +1,5 @@
 {
-  description = "rustle: dictation for Linux with a themed overlay";
+  description = "oxivox: dictation for Linux with a themed overlay";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
 
@@ -26,8 +26,8 @@
       runtimeTools = with pkgs; [ wl-clipboard playerctl fontconfig pipewire ];
     in {
       packages.${system} = rec {
-        rustle = pkgs.rustPlatform.buildRustPackage {
-          pname = "rustle-dictation";
+        oxivox = pkgs.rustPlatform.buildRustPackage {
+          pname = "oxivox";
           version = "0.1.0";
           src = self;
           cargoLock.lockFile = ./Cargo.lock;
@@ -36,19 +36,19 @@
           dontUseCmakeConfigure = true;
           doCheck = false;
           postFixup = ''
-            wrapProgram $out/bin/rustle \
+            wrapProgram $out/bin/oxivox \
               --prefix PATH : ${pkgs.lib.makeBinPath runtimeTools} \
               --prefix LD_LIBRARY_PATH : ${pkgs.lib.makeLibraryPath [ pkgs.vulkan-loader pkgs.wayland pkgs.libxkbcommon ]}
           '';
           nativeBuildInputs = nativeBuildInputs ++ [ pkgs.makeWrapper ];
-          meta.mainProgram = "rustle";
+          meta.mainProgram = "oxivox";
         };
-        default = rustle;
+        default = oxivox;
       };
 
       homeManagerModules = rec {
-        rustle = import ./nix/home-manager.nix { inherit self; };
-        default = rustle;
+        oxivox = import ./nix/home-manager.nix { inherit self; };
+        default = oxivox;
       };
 
       devShells.${system}.default = pkgs.mkShell {

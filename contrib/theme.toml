@@ -1,4 +1,4 @@
-# $XDG_CONFIG_HOME/rustle/theme.toml: every key is optional, missing ones use Tokyo Night.
+# $XDG_CONFIG_HOME/oxivox/theme.toml: every key is optional, missing ones use Tokyo Night.
 background = "#1a1b26"
 surface = "#24283b"
 border = "#414868"

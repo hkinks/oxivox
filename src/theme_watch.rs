@@ -66,7 +66,7 @@ mod tests {
 
     #[test]
     fn reloads_on_write_and_on_replace_without_looping() {
-        let dir = std::env::temp_dir().join(format!("rustle-theme-watch-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("oxivox-theme-watch-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("theme.toml");
         let (tx, rx) = mpsc::channel();

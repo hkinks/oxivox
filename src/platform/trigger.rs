@@ -1,4 +1,4 @@
-//! Trigger for compositors without a global-shortcut API: the user binds a key to `rustle toggle`,
+//! Trigger for compositors without a global-shortcut API: the user binds a key to `oxivox toggle`,
 //! which reaches the daemon over a Unix socket.
 
 use anyhow::{Context, Result, bail};
@@ -29,7 +29,7 @@ impl SocketTrigger {
     pub fn bind(path: PathBuf) -> Result<(Self, SocketGuard)> {
         if path.exists() {
             if UnixStream::connect(&path).is_ok() {
-                bail!("another rustle daemon is already listening on {}", path.display());
+                bail!("another oxivox daemon is already listening on {}", path.display());
             }
             std::fs::remove_file(&path).context("removing stale socket")?;
         }
@@ -77,7 +77,7 @@ mod tests {
     use crate::ipc;
 
     fn socket_path(name: &str) -> PathBuf {
-        std::env::temp_dir().join(format!("rustle-test-{}-{name}.sock", std::process::id()))
+        std::env::temp_dir().join(format!("oxivox-test-{}-{name}.sock", std::process::id()))
     }
 
     #[test]
@@ -110,6 +110,6 @@ mod tests {
     #[test]
     fn the_client_explains_a_missing_daemon() {
         let message = format!("{:#}", ipc::send(&socket_path("missing"), Command::Toggle).unwrap_err());
-        assert!(message.contains("rustle daemon"), "{message}");
+        assert!(message.contains("oxivox daemon"), "{message}");
     }
 }

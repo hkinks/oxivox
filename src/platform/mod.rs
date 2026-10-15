@@ -67,7 +67,7 @@ pub trait Media {
     fn resume(&mut self);
 }
 
-/// Binds Escape to `rustle cancel` while a recording is active.
+/// Binds Escape to `oxivox cancel` while a recording is active.
 pub trait CancelKey {
     fn set_armed(&self, armed: bool);
 }

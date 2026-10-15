@@ -1,11 +1,11 @@
-# rustle: design spec
+# oxivox: design spec
 
 Superwhisper-quality dictation for Linux, written in Rust. Press a key, speak, press again: the text appears in the
 app you were in. A small themed overlay with a row of voice-driven dots is the only thing on screen.
 
-Name: **rustle** (2026-10-14). The first pick, "wisprs", clashes with the commercial speech-to-text product wisprs.co
-(GitHub org `Wisprs`) and is one letter from Wispr Flow. crates.io `rustle` is an unrelated crate, so the Cargo package
-is `rustle-dictation`; the app and binary are `rustle`.
+Name: **oxivox** (oxide + vox, 2026-10-15). Earlier names were dropped: "wisprs" clashes with the commercial
+speech-to-text product wisprs.co and is one letter from Wispr Flow; "rustle" is taken on crates.io and by other
+projects. `oxivox` is the Cargo package, the app and the binary.
 
 Licence: MIT OR Apache-2.0.
 
@@ -25,13 +25,13 @@ Licence: MIT OR Apache-2.0.
 - Escape cancels while recording or transcribing (only bound then, through a Hyprland submap).
 - Model: whisper large-v3-turbo (`ggml-large-v3-turbo.bin`) via whisper.cpp with the Vulkan backend, loaded once and
   kept in VRAM. Language comes from config (default: auto); the model decides what's possible.
-- Model path default: `~/.local/share/rustle/models/ggml-large-v3-turbo.bin`, falling back to the voxtype copy in
+- Model path default: `~/.local/share/oxivox/models/ggml-large-v3-turbo.bin`, falling back to the voxtype copy in
   `~/.local/share/voxtype/models/`.
 
 ## Architecture
 
 One process (daemon + overlay), a user service bound to the graphical session. A small CLI talks to it over a Unix
-socket at `$XDG_RUNTIME_DIR/rustle.sock`.
+socket at `$XDG_RUNTIME_DIR/oxivox.sock`.
 
 Portable core (no desktop dependencies): state machine, audio buffer, `Engine` trait + whisper implementation,
 voice level meter with automatic gain, overlay drawing into an RGBA pixel buffer (`tiny-skia`), config, palette.
@@ -40,7 +40,7 @@ Platform adapters, one trait each:
 
 | trait | Hyprland / Noctalia / NixOS (v1) | GNOME / KDE (later) | Windows / macOS (later) |
 |---|---|---|---|
-| `Trigger` | Hyprland bind runs `rustle toggle` | GlobalShortcuts portal | native hotkey API |
+| `Trigger` | Hyprland bind runs `oxivox toggle` | GlobalShortcuts portal | native hotkey API |
 | `Capture` | PipeWire (`pipewire` crate) | PipeWire | `cpal` |
 | `Surface` | wlr layer-shell via `smithay-client-toolkit`, shm buffer, click-through, no keyboard focus | KDE: layer-shell; GNOME: always-on-top window or Shell extension | `winit` + `softbuffer` |
 | `Output` | clipboard + Hyprland `sendshortcut` to the window focused at start | clipboard + RemoteDesktop portal | clipboard + SendInput / CGEvent |
@@ -70,9 +70,9 @@ Max recording length: config, default 300 s (stops and transcribes).
   2026-10-14: too faint at headset levels and too busy.)
 - Appears with a 120 ms fade and scale-in, hides with a 150 ms fade. 60 fps while visible, no surface and no rendering when hidden.
 - HiDPI: rendered at the output scale, fractional ones too (fractional-scale-v1 with a viewport; integer buffer scale as fallback); the border stays a whole number of device pixels.
-- Palette: `background`, `surface`, `border`, `accent`, `text`, `error` from `$XDG_CONFIG_HOME/rustle/theme.toml`,
+- Palette: `background`, `surface`, `border`, `accent`, `text`, `error` from `$XDG_CONFIG_HOME/oxivox/theme.toml`,
   reloaded on change (inotify). Noctalia writes this file through a user theme template
-  (`[theme.templates.user.rustle]`, template in `contrib/noctalia/`). Missing file: built-in Tokyo Night.
+  (`[theme.templates.user.oxivox]`, template in `contrib/noctalia/`). Missing file: built-in Tokyo Night.
 
 ## Errors
 
@@ -86,7 +86,7 @@ Max recording length: config, default 300 s (stops and transcribes).
 
 ## Config
 
-`$XDG_CONFIG_HOME/rustle/config.toml`: model path, language, max length, overlay size/position, paste keys per window
+`$XDG_CONFIG_HOME/oxivox/config.toml`: model path, language, max length, overlay size/position, paste keys per window
 class. Every key optional.
 
 ## Testing

@@ -73,12 +73,12 @@ fn run(sink: SharedSink, source: Option<String>, stop: pw::channel::Receiver<()>
         *pw::keys::MEDIA_TYPE => "Audio",
         *pw::keys::MEDIA_CATEGORY => "Capture",
         *pw::keys::MEDIA_ROLE => "Communication",
-        *pw::keys::APP_NAME => "rustle",
+        *pw::keys::APP_NAME => "oxivox",
     };
     if let Some(source) = source {
         props.insert(*pw::keys::TARGET_OBJECT, source);
     }
-    let stream = pw::stream::StreamBox::new(&core, "rustle", props)?;
+    let stream = pw::stream::StreamBox::new(&core, "oxivox", props)?;
 
     // Both callbacks run on this thread's loop.
     let on_state = sink.clone();

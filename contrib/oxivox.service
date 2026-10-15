@@ -1,10 +1,10 @@
 [Unit]
-Description=rustle dictation daemon
+Description=oxivox dictation daemon
 PartOf=graphical-session.target
 After=graphical-session.target
 
 [Service]
-ExecStart=rustle daemon
+ExecStart=oxivox daemon
 Restart=on-failure
 RestartSec=3
 

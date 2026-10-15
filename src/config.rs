@@ -1,4 +1,4 @@
-//! `$XDG_CONFIG_HOME/rustle/config.toml`. Every key is optional.
+//! `$XDG_CONFIG_HOME/oxivox/config.toml`. Every key is optional.
 
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
@@ -24,7 +24,7 @@ pub struct Config {
     pub media_ignore: Vec<String>,
     pub overlay: OverlayConfig,
     pub paste: PasteConfig,
-    /// Hyprland submap that binds Escape to `rustle cancel`; entered while recording or transcribing.
+    /// Hyprland submap that binds Escape to `oxivox cancel`; entered while recording or transcribing.
     pub cancel_submap: Option<String>,
 }
 
@@ -240,6 +240,6 @@ mod tests {
 
     #[test]
     fn missing_file_is_default() {
-        assert_eq!(Config::load(Path::new("/nonexistent/rustle.toml")).unwrap(), Config::default());
+        assert_eq!(Config::load(Path::new("/nonexistent/oxivox.toml")).unwrap(), Config::default());
     }
 }

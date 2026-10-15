@@ -1,4 +1,4 @@
-# rustle
+# oxivox
 
 Local, private dictation for Linux. Press a key, speak, press it again: the text appears in the app you were typing
 in. A small overlay with a row of dots that follow your voice is the only thing on screen.
@@ -36,47 +36,47 @@ overlay drawing) is shared. See [docs/spec.md](docs/spec.md).
 - A GPU with Vulkan; the CPU works too, much slower (`gpu = false` in the config)
 - PipeWire
 - A Wayland compositor with wlr layer-shell; Hyprland for the hotkey, focus and paste integration
-- The Whisper model `ggml-large-v3-turbo.bin` (about 1.6 GB) in `~/.local/share/rustle/models/`:
+- The Whisper model `ggml-large-v3-turbo.bin` (about 1.6 GB) in `~/.local/share/oxivox/models/`:
 
 ```sh
-mkdir -p ~/.local/share/rustle/models
-curl -L -o ~/.local/share/rustle/models/ggml-large-v3-turbo.bin \
+mkdir -p ~/.local/share/oxivox/models
+curl -L -o ~/.local/share/oxivox/models/ggml-large-v3-turbo.bin \
   https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin
 ```
 
 ## Usage
 
 ```sh
-rustle daemon      # usually started by the user service
-rustle toggle      # bind this to a key
-rustle cancel      # bind to Escape while recording
-rustle transcribe recording.wav
+oxivox daemon      # usually started by the user service
+oxivox toggle      # bind this to a key
+oxivox cancel      # bind to Escape while recording
+oxivox transcribe recording.wav
 ```
 
-`rustle status` prints the daemon's state, `rustle overlay-demo` shows the overlay with synthetic audio (no model, no
+`oxivox status` prints the daemon's state, `oxivox overlay-demo` shows the overlay with synthetic audio (no model, no
 microphone). Hyprland binds, including Escape-to-cancel through a submap, are in
-[contrib/hyprland.conf](contrib/hyprland.conf); a systemd user unit is in [contrib/rustle.service](contrib/rustle.service).
+[contrib/hyprland.conf](contrib/hyprland.conf); a systemd user unit is in [contrib/oxivox.service](contrib/oxivox.service).
 
 ## Configuration
 
-Every key is optional. `$XDG_CONFIG_HOME/rustle/config.toml` sets the model path, language, maximum recording length,
+Every key is optional. `$XDG_CONFIG_HOME/oxivox/config.toml` sets the model path, language, maximum recording length,
 GPU use, microphone, overlay size and paste keys per window class; [contrib/config.toml](contrib/config.toml) lists all
-keys with their defaults. The overlay colours come from `$XDG_CONFIG_HOME/rustle/theme.toml`, reloaded on change; see
+keys with their defaults. The overlay colours come from `$XDG_CONFIG_HOME/oxivox/theme.toml`, reloaded on change; see
 [docs/theming.md](docs/theming.md) (including a Noctalia template).
 
 ## NixOS / Home Manager
 
-The flake exports a Home Manager module that installs the package, runs `rustle daemon` as a systemd user service
+The flake exports a Home Manager module that installs the package, runs `oxivox daemon` as a systemd user service
 and writes the config files:
 
 ```nix
 {
-  inputs.rustle.url = "github:hkinks/rustle";   # or a local path
+  inputs.oxivox.url = "github:hkinks/oxivox";   # or a local path
 
   # in your Home Manager configuration
-  imports = [ inputs.rustle.homeManagerModules.default ];
+  imports = [ inputs.oxivox.homeManagerModules.default ];
 
-  services.rustle = {
+  services.oxivox = {
     enable = true;
     settings = { language = "en"; media_ignore = [ "vlc" ]; };   # config.toml
     # theme = { accent = "#7aa2f7"; };                           # theme.toml; null (default) leaves it unmanaged
@@ -88,11 +88,11 @@ and writes the config files:
 | option | default | meaning |
 |---|---|---|
 | `enable` | `false` | install the package and run the user service |
-| `package` | the flake's package | the rustle package |
+| `package` | the flake's package | the oxivox package |
 | `settings` | `{ }` | `config.toml` (omitted when empty) |
 | `theme` | `null` | `theme.toml`; null leaves it to Noctalia or you |
-| `hyprland.enable` | `false` | add the binds to `wayland.windowManager.hyprland` and set `settings.cancel_submap = "rustle"` |
-| `hyprland.toggleBind` | `"ALT, SPACE"` | the dictation key, also bound inside the `rustle` submap so a recording can be stopped |
+| `hyprland.enable` | `false` | add the binds to `wayland.windowManager.hyprland` and set `settings.cancel_submap = "oxivox"` |
+| `hyprland.toggleBind` | `"ALT, SPACE"` | the dictation key, also bound inside the `oxivox` submap so a recording can be stopped |
 
 The Hyprland integration uses `wayland.windowManager.hyprland.submaps` (Home Manager 26.05 or newer).
 

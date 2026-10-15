@@ -66,7 +66,7 @@ impl Focus for Hyprland {
     }
 }
 
-/// Enters a Hyprland submap that the user's config binds Escape to `rustle cancel` in, and leaves it again.
+/// Enters a Hyprland submap that the user's config binds Escape to `oxivox cancel` in, and leaves it again.
 pub struct SubmapCancel {
     hypr: Hyprland,
     name: String,
