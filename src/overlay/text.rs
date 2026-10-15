@@ -47,8 +47,8 @@ pub fn draw_centered(pixmap: &mut Pixmap, font: &Font, text: &str, px: f32, cx: 
                     continue;
                 }
                 let alpha = coverage[row * metrics.width + col] as f32 / 255.0 * color.a as f32 / 255.0;
-                let px = &mut data[((y * width + x) * 4) as usize..][..4];
-                for (dst, src) in px.iter_mut().zip([color.r, color.g, color.b, 255]) {
+                let pixel = &mut data[((y * width + x) * 4) as usize..][..4];
+                for (dst, src) in pixel.iter_mut().zip([color.r, color.g, color.b, 255]) {
                     // Premultiplied source-over.
                     *dst = (src as f32 * alpha + *dst as f32 * (1.0 - alpha)).round() as u8;
                 }

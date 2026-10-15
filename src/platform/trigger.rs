@@ -38,11 +38,10 @@ impl SocketTrigger {
     }
 }
 
-fn serve_connection(stream: UnixStream, on_request: &(dyn Fn(Request) + Send)) -> Result<()> {
+fn serve_connection(mut stream: UnixStream, on_request: &(dyn Fn(Request) + Send)) -> Result<()> {
     stream.set_read_timeout(Some(Duration::from_secs(2)))?;
     let mut line = String::new();
     BufReader::new(&stream).read_line(&mut line)?;
-    let mut stream = stream;
     if line.is_empty() {
         return Ok(()); // probe: the peer connected and left again
     }

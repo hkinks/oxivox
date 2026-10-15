@@ -126,10 +126,9 @@ fn transcribe(file: PathBuf, model: Option<PathBuf>, language: Option<String>, g
         Some(model) => model,
         None => config.model_path()?,
     };
-    let language = language.unwrap_or_else(|| config.language.clone());
-    let language = (language != "auto" && !language.is_empty()).then_some(language);
+    let language = language.as_deref().or(config.language_code()).and_then(config::whisper_language);
     let audio = audio::read_wav(&file)?;
-    let mut engine = WhisperEngine::load(&model, language.as_deref(), gpu && config.gpu, config.gpu_fallback_cpu)?;
+    let mut engine = WhisperEngine::load(&model, language, gpu && config.gpu, config.gpu_fallback_cpu)?;
     let raw = engine.transcribe(&audio, &Default::default())?;
     println!("{}", tokens::clean(&raw));
     Ok(())
@@ -201,9 +200,9 @@ fn run_daemon(dry_run: bool, socket: PathBuf) -> Result<()> {
 fn bench(file: &std::path::Path, runs: u32, pause: u64, language: Option<String>, beam: i32) -> Result<()> {
     let config = Config::load_default()?;
     let audio = audio::read_wav(file)?;
-    let language = language.filter(|l| l != "auto");
+    let language = language.as_deref().and_then(config::whisper_language);
     let started = std::time::Instant::now();
-    let mut engine = WhisperEngine::load(&config.model_path()?, language.as_deref(), true, config.gpu_fallback_cpu)?;
+    let mut engine = WhisperEngine::load(&config.model_path()?, language, true, config.gpu_fallback_cpu)?;
     engine.beam = beam;
     eprintln!("load: {:.2}s, audio {:.1}s", started.elapsed().as_secs_f32(), audio.len() as f32 / 16000.0);
     for run in 1..=runs {

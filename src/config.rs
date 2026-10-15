@@ -110,6 +110,14 @@ impl PasteConfig {
     }
 }
 
+/// Whisper language code for a configured or command-line value, `None` for auto-detection.
+pub fn whisper_language(language: &str) -> Option<&str> {
+    match language {
+        "" | "auto" => None,
+        code => Some(code),
+    }
+}
+
 impl Config {
     pub fn parse(text: &str) -> Result<Self> {
         toml::from_str(text).context("invalid config")
@@ -130,10 +138,7 @@ impl Config {
 
     /// Whisper language code, `None` for auto-detection.
     pub fn language_code(&self) -> Option<&str> {
-        match self.language.as_str() {
-            "" | "auto" => None,
-            code => Some(code),
-        }
+        whisper_language(&self.language)
     }
 
     pub fn model_path(&self) -> Result<PathBuf> {

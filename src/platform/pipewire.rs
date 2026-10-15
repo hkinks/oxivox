@@ -1,4 +1,4 @@
-//! Microphone capture from the default PipeWire source.
+//! Microphone capture from a PipeWire source: the configured one, else the default.
 
 use anyhow::{Context, Result};
 use pipewire as pw;

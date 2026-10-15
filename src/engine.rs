@@ -24,7 +24,7 @@ const WARM_UP_WAV: &[u8] = include_bytes!("../assets/warmup.wav");
 /// whisper.cpp keeps the model on the GPU for the lifetime of this value.
 pub struct WhisperEngine {
     // The state holds its own reference to the context's weights; keep the context alive regardless.
-    _ctx: WhisperContext,
+    ctx: WhisperContext,
     state: WhisperState,
     pub language: Option<String>,
     threads: i32,
@@ -58,7 +58,11 @@ impl WhisperEngine {
         let state = ctx.create_state().map_err(|e| anyhow::anyhow!("{e:?}")).context("creating whisper state")?;
         // The GPU does the heavy work; the CPU path wants every core it can get.
         let threads = if gpu { 4 } else { std::thread::available_parallelism().map_or(4, |n| n.get().min(8)) as i32 };
-        Ok(Self { _ctx: ctx, state, language: language.map(String::from), threads, beam: 5 })
+        Ok(Self { ctx, state, language: language.map(String::from), threads, beam: 5 })
+    }
+
+    pub fn print_timings(&self) {
+        self.ctx.print_timings();
     }
 }
 
@@ -81,12 +85,6 @@ fn choose_device(free: u64, model_bytes: u64, fallback_cpu: bool) -> Result<bool
         "not enough free GPU memory for the model: {free_mb} MB free, about {needed_mb} MB needed. \
          Free some GPU memory, or set `gpu_fallback_cpu = true` (slow) or `gpu = false` in the config"
     )
-}
-
-impl WhisperEngine {
-    pub fn print_timings(&self) {
-        self._ctx.print_timings();
-    }
 }
 
 impl Engine for WhisperEngine {

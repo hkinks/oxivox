@@ -66,6 +66,27 @@ pub fn read_wav_from(source: impl std::io::Read) -> Result<Vec<f32>> {
     Ok(to_mono_16k(&samples, spec.channels as usize, spec.sample_rate))
 }
 
+/// Samples per level frame (16 ms).
+pub const LEVEL_FRAME: usize = 256;
+
+/// Cuts a sample stream into frames and reports the RMS of each completed one.
+#[derive(Default)]
+pub struct FrameMeter {
+    pending: Vec<f32>,
+}
+
+impl FrameMeter {
+    pub fn push(&mut self, samples: &[f32]) -> Vec<f32> {
+        self.pending.extend_from_slice(samples);
+        let frames = self.pending.chunks_exact(LEVEL_FRAME);
+        let levels =
+            frames.clone().map(|f| (f.iter().map(|s| s * s).sum::<f32>() / LEVEL_FRAME as f32).sqrt()).collect();
+        let used = frames.len() * LEVEL_FRAME;
+        self.pending.drain(..used);
+        levels
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -108,26 +129,5 @@ mod tests {
         let out = to_mono_16k(&[0.0, 1.0, 0.0, 1.0], 1, 8_000);
         assert_eq!(out.len(), 8);
         assert!((out[1] - 0.5).abs() < 1e-6);
-    }
-}
-
-/// Samples per level frame (16 ms).
-pub const LEVEL_FRAME: usize = 256;
-
-/// Cuts a sample stream into frames and reports the RMS of each completed one.
-#[derive(Default)]
-pub struct FrameMeter {
-    pending: Vec<f32>,
-}
-
-impl FrameMeter {
-    pub fn push(&mut self, samples: &[f32]) -> Vec<f32> {
-        self.pending.extend_from_slice(samples);
-        let frames = self.pending.chunks_exact(LEVEL_FRAME);
-        let levels =
-            frames.clone().map(|f| (f.iter().map(|s| s * s).sum::<f32>() / LEVEL_FRAME as f32).sqrt()).collect();
-        let used = frames.len() * LEVEL_FRAME;
-        self.pending.drain(..used);
-        levels
     }
 }
